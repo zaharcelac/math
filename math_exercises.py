@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 from collections.abc import Callable
 from datetime import datetime
+import io
 import math
 import os
 import random
@@ -23,13 +24,16 @@ FONT_SIZE_BODY_ADDITION_BALANCE = 22
 FONT_SIZE_BODY_SUBTRACTION_BALANCE = 22
 FONT_SIZE_SHEET_FOOTER = 10
 
-# Footer line for "TEST x OF y" (mm); optional URL is on the same line
-PDF_SHEET_FOOTER_FROM_BOTTOM = 12
+# Gap from physical page bottom to bottom of footer row (mm). Increase to move footer up.
+PDF_SHEET_FOOTER_FROM_BOTTOM = 10
 PDF_SHEET_FOOTER_LINE_HEIGHT = 5
 # Reserve this much space from the bottom for the footer + auto page-break margin (content stays above)
 PDF_FOOTER_ZONE_MM = (
     PDF_SHEET_FOOTER_FROM_BOTTOM + PDF_SHEET_FOOTER_LINE_HEIGHT + 3
 )
+# QR at end of footer line (same payload as ``footer_url``); only when a URL is shown
+PDF_FOOTER_QR_SIZE_MM = 12
+PDF_FOOTER_QR_GAP_MM = 10
 
 # Fallback when env vars are unset and there is no ``request_base`` (e.g. CLI ``--print``).
 # After ``WORKSHEET_FOOTER_URL``, ``PUBLIC_BASE_URL``, and ``request_base`` in
@@ -40,7 +44,8 @@ DEFAULT_WORKSHEET_FOOTER_URL = "<URL HERE>"
 PDF_LINE_SPACING_FACTOR = 2.5
 PDF_GAP_SECTION = int(12 * PDF_LINE_SPACING_FACTOR)
 PDF_CELL_TITLE_HEIGHT = int(10 * PDF_LINE_SPACING_FACTOR)
-PDF_GAP_AFTER_TITLE = int(4 * PDF_LINE_SPACING_FACTOR)
+PDF_GAP_AFTER_TITLE_BASE = 2
+PDF_GAP_AFTER_TITLE = int(PDF_GAP_AFTER_TITLE_BASE * PDF_LINE_SPACING_FACTOR)
 PDF_GAP_TASK_ROW = int(8 * PDF_LINE_SPACING_FACTOR)
 PDF_CELL_TASK_HEIGHT = int(8 * PDF_LINE_SPACING_FACTOR)
 # Exercise grid width on the page (usable width ~190 mm on Letter)
@@ -134,6 +139,53 @@ def resolve_worksheet_footer_url(request_base: str | None = None) -> str | None:
     if DEFAULT_WORKSHEET_FOOTER_URL and DEFAULT_WORKSHEET_FOOTER_URL.strip():
         return DEFAULT_WORKSHEET_FOOTER_URL.strip().rstrip("/")
     return None
+
+
+def _pdf_footer_reserve_mm(footer_url: str | None) -> float:
+    """Bottom margin for auto page-break: one footer line + optional QR on the same row."""
+    if footer_url:
+        return max(
+            PDF_FOOTER_ZONE_MM,
+            PDF_FOOTER_QR_SIZE_MM + PDF_FOOTER_QR_GAP_MM + PDF_SHEET_FOOTER_LINE_HEIGHT,
+        )
+    return PDF_FOOTER_ZONE_MM
+
+
+def _truncate_text_to_width(pdf: object, text: str, max_w: float) -> str:
+    """Shorten ``text`` so ``get_string_width`` fits ``max_w`` (ellipsis if needed)."""
+    if pdf.get_string_width(text) <= max_w:
+        return text
+    ellipsis = "..."
+    if pdf.get_string_width(ellipsis) > max_w:
+        return ""
+    lo, hi = 0, len(text)
+    while lo < hi:
+        mid = (lo + hi + 1) // 2
+        candidate = text[:mid] + ellipsis
+        if pdf.get_string_width(candidate) <= max_w:
+            lo = mid
+        else:
+            hi = mid - 1
+    return text[:lo] + ellipsis if lo > 0 else ellipsis
+
+
+def _footer_qr_png(url: str) -> io.BytesIO:
+    """PNG bytes for a small QR code encoding ``url`` (same string as footer text)."""
+    import qrcode
+
+    buf = io.BytesIO()
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=2,
+        border=1,
+    )
+    qr.add_data(url)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    img.save(buf, format="PNG")
+    buf.seek(0)
+    return buf
 
 
 def digit_slots(max_number: int) -> int:
@@ -531,7 +583,7 @@ def _render_pdf_sheet_footer(
     tasks_per_type: int,
     footer_url: str | None = None,
 ) -> None:
-    """Draw TEST x OF y, max-number, total, and optional URL on one footer line."""
+    """Draw TEST line; with a URL, one row: text then QR (same payload as URL), no column split."""
     from fpdf.enums import XPos, YPos
 
     label = (
@@ -539,18 +591,54 @@ def _render_pdf_sheet_footer(
         f"MAX-NUMBER {max_number}   TOTAL {tasks_per_type}"
     )
     text = f"{label}   {footer_url}" if footer_url else label
+    margin = _pdf_footer_reserve_mm(footer_url)
     pdf.set_auto_page_break(auto=False)
-    pdf.set_y(-PDF_SHEET_FOOTER_FROM_BOTTOM)
     pdf.set_font("courier", size=FONT_SIZE_SHEET_FOOTER)
-    pdf.multi_cell(
-        0,
-        PDF_SHEET_FOOTER_LINE_HEIGHT,
-        text,
-        align="C",
-        new_x=XPos.LMARGIN,
-        new_y=YPos.NEXT,
-    )
-    pdf.set_auto_page_break(auto=True, margin=PDF_FOOTER_ZONE_MM)
+    if footer_url:
+        qr_h = PDF_FOOTER_QR_SIZE_MM
+        gap = PDF_FOOTER_QR_GAP_MM
+        line_h = PDF_SHEET_FOOTER_LINE_HEIGHT
+        cm = pdf.c_margin
+        # cell() adds horizontal padding; keep text+QR on one row within epw.
+        max_plain_w = pdf.epw - gap - qr_h - 2 * cm
+        line_text = _truncate_text_to_width(pdf, text, max_plain_w)
+        cell_w = pdf.get_string_width(line_text) + 2 * cm
+        total_w = cell_w + gap + qr_h
+        row_h = max(qr_h, line_h)
+        row_top = pdf.h - row_h - PDF_SHEET_FOOTER_FROM_BOTTOM
+        x_start = pdf.l_margin + max(0.0, (pdf.epw - total_w) / 2)
+        text_y = row_top + (row_h - line_h) / 2
+        qr_y = row_top + (row_h - qr_h) / 2
+
+        pdf.set_xy(x_start, text_y)
+        pdf.cell(
+            None,
+            line_h,
+            line_text,
+            new_x=XPos.RIGHT,
+            new_y=YPos.TOP,
+        )
+        qr_x = pdf.get_x() + gap
+        qr_buf = _footer_qr_png(footer_url)
+        pdf.image(
+            qr_buf,
+            x=qr_x,
+            y=qr_y,
+            w=qr_h,
+            h=qr_h,
+            alt_text=f"QR {footer_url}",
+        )
+    else:
+        pdf.set_y(-PDF_SHEET_FOOTER_FROM_BOTTOM)
+        pdf.multi_cell(
+            0,
+            PDF_SHEET_FOOTER_LINE_HEIGHT,
+            text,
+            align="C",
+            new_x=XPos.LMARGIN,
+            new_y=YPos.NEXT,
+        )
+    pdf.set_auto_page_break(auto=True, margin=margin)
 
 
 def _render_pdf_worksheet_page(
@@ -610,7 +698,7 @@ def _build_pdf_document(
     from fpdf import FPDF
 
     pdf = FPDF(format="letter")
-    pdf.set_auto_page_break(auto=True, margin=PDF_FOOTER_ZONE_MM)
+    pdf.set_auto_page_break(auto=True, margin=_pdf_footer_reserve_mm(footer_url))
     test_count = len(pages_sections)
     for idx, sections in enumerate(pages_sections, start=1):
         _render_pdf_worksheet_page(

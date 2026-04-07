@@ -5,7 +5,7 @@
 ## Requirements
 
 - **Python 3.9+** (uses `list[str]` style annotations with `from __future__ import annotations` for broader compatibility)
-- **PDF output:** [fpdf2](https://pypi.org/project/fpdf2/) (see `requirements.txt`)
+- **PDF output:** [fpdf2](https://pypi.org/project/fpdf2/) and [qrcode](https://pypi.org/project/qrcode/) with Pillow for footer QR codes (see `requirements.txt`)
 - **Web UI (optional):** FastAPI, Uvicorn, Jinja2, python-multipart (same `requirements.txt`)
 
 ## Install
@@ -97,7 +97,7 @@ python3 math_exercises.py --types addition subtraction-missing-minuend --total 8
 - **Footer (every page):** centered line of the form  
   `TEST i OF n   MAX-NUMBER …   TOTAL …`  
   where `i`/`n` come from `--sheets`, and the last two fields mirror `--max-number` and `--total`.
-- **Footer URL (optional):** when resolved, the URL is appended on the **same** centered line as `TEST … MAX-NUMBER … TOTAL …`. Order of precedence: `WORKSHEET_FOOTER_URL`, `PUBLIC_BASE_URL`, the request’s `base_url` (web app), then `DEFAULT_WORKSHEET_FOOTER_URL` in `math_exercises.py`. Env overrides everything else.
+- **Footer URL (optional):** when resolved, the URL is appended on the **same** centered line as `TEST … MAX-NUMBER … TOTAL …`, and a **small QR code** is drawn under that line encoding the **same** URL string. Order of precedence: `WORKSHEET_FOOTER_URL`, `PUBLIC_BASE_URL`, the request’s `base_url` (web app), then `DEFAULT_WORKSHEET_FOOTER_URL` in `math_exercises.py`. Env overrides everything else.
 
 With `--print` and `--sheets` greater than 1, stdout shows only the **first** worksheet; the PDF contains all sheets.
 
@@ -114,7 +114,7 @@ Within each worksheet (one run of `build_sections`):
 | File | Role |
 |------|------|
 | `math_exercises.py` | CLI and generator |
-| `requirements.txt` | `fpdf2` for `--print` |
+| `requirements.txt` | `fpdf2` and `qrcode[pil]` for `--print` (PDF + footer QR) |
 
 ## License
 
