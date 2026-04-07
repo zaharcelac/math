@@ -79,6 +79,7 @@ Each type uses `--total` problems. Default order when `--types` is omitted:
 | `addition-missing-second` | `ams`, `am2` | `a + __ = c` |
 | `subtraction-missing-minuend` | `smf`, `sm1`, `smm` | `__ - b = c` |
 | `subtraction-missing-subtrahend` | `sms`, `sm2`, `smt` | `a - __ = c` |
+| `addition-balance` | `ab`, `balance`, `bal` | `a + b = c + __` (same sum both sides; all values ≤ max-number) |
 
 Example:
 

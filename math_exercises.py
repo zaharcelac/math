@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 Generate simple math exercises for grade 1.
-Types: addition, subtraction, missing addends, missing minuend, missing subtrahend.
+Types: addition, subtraction, missing addends, missing minuend, missing subtrahend,
+balance addition (X + Y = W + _).
 """
 from __future__ import annotations
 
@@ -16,6 +17,8 @@ from pathlib import Path
 # PDF font sizes
 FONT_SIZE_HEADING = 22
 FONT_SIZE_BODY = 26
+# Longer lines (X + Y = W + _); tune independently of FONT_SIZE_BODY
+FONT_SIZE_BODY_ADDITION_BALANCE = 22
 FONT_SIZE_SHEET_FOOTER = 10
 
 # Footer line for "TEST x OF y" (mm)
@@ -43,6 +46,7 @@ TYPE_ADDITION_MISSING_FIRST = "addition-missing-first"
 TYPE_ADDITION_MISSING_SECOND = "addition-missing-second"
 TYPE_SUBTRACTION_MISSING_MINUEND = "subtraction-missing-minuend"
 TYPE_SUBTRACTION_MISSING_SUBTRAHEND = "subtraction-missing-subtrahend"
+TYPE_ADDITION_BALANCE = "addition-balance"
 
 EXERCISE_TYPES_ORDER: tuple[str, ...] = (
     TYPE_ADDITION,
@@ -51,6 +55,7 @@ EXERCISE_TYPES_ORDER: tuple[str, ...] = (
     TYPE_ADDITION_MISSING_SECOND,
     TYPE_SUBTRACTION_MISSING_MINUEND,
     TYPE_SUBTRACTION_MISSING_SUBTRAHEND,
+    TYPE_ADDITION_BALANCE,
 )
 
 EXERCISE_TITLES: dict[str, str] = {
@@ -60,6 +65,7 @@ EXERCISE_TITLES: dict[str, str] = {
     TYPE_ADDITION_MISSING_SECOND: "ADDITION (MISSING SECOND ADDEND)",
     TYPE_SUBTRACTION_MISSING_MINUEND: "SUBTRACTION (MISSING MINUEND)",
     TYPE_SUBTRACTION_MISSING_SUBTRAHEND: "SUBTRACTION (MISSING SUBTRAHEND)",
+    TYPE_ADDITION_BALANCE: "ADDITION (BALANCE)",
 }
 
 # CLI --types: full names or abbreviations (case-insensitive)
@@ -70,6 +76,7 @@ EXERCISE_TYPE_ALIASES: dict[str, str] = {
     TYPE_ADDITION_MISSING_SECOND: TYPE_ADDITION_MISSING_SECOND,
     TYPE_SUBTRACTION_MISSING_MINUEND: TYPE_SUBTRACTION_MISSING_MINUEND,
     TYPE_SUBTRACTION_MISSING_SUBTRAHEND: TYPE_SUBTRACTION_MISSING_SUBTRAHEND,
+    TYPE_ADDITION_BALANCE: TYPE_ADDITION_BALANCE,
     "a": TYPE_ADDITION,
     "add": TYPE_ADDITION,
     "s": TYPE_SUBTRACTION,
@@ -84,6 +91,9 @@ EXERCISE_TYPE_ALIASES: dict[str, str] = {
     "sms": TYPE_SUBTRACTION_MISSING_SUBTRAHEND,
     "sm2": TYPE_SUBTRACTION_MISSING_SUBTRAHEND,
     "smt": TYPE_SUBTRACTION_MISSING_SUBTRAHEND,
+    "ab": TYPE_ADDITION_BALANCE,
+    "balance": TYPE_ADDITION_BALANCE,
+    "bal": TYPE_ADDITION_BALANCE,
 }
 
 
@@ -103,13 +113,24 @@ def align_equation_line(task: str, max_number: int) -> str:
     col_w = digit_slots(max_number)
     blank_fill = "_" * col_w
     parts = task.split()
-    if len(parts) != 5 or parts[3] != "=" or parts[1] not in ("+", "-"):
-        return task
 
     def slot(token: str) -> str:
-        if token and set(token) == {"_"}:
+        if token and set(token) <= {"_"}:
             return blank_fill
         return str(int(token)).rjust(col_w)
+
+    # X + Y = W + _  (equal sums; missing last addend on the right)
+    if (
+        len(parts) == 7
+        and parts[3] == "="
+        and parts[1] == "+"
+        and parts[5] == "+"
+    ):
+        a, _p1, b, _eq, w, _p2, c = parts
+        return f"{slot(a)} + {slot(b)} = {slot(w)} + {slot(c)}"
+
+    if len(parts) != 5 or parts[3] != "=" or parts[1] not in ("+", "-"):
+        return task
 
     a, op, b, _eq, c = parts
     return f"{slot(a)} {op} {slot(b)} = {slot(c)}"
@@ -353,6 +374,52 @@ def generate_subtraction_missing_subtrahend_tasks(
     return tasks
 
 
+def generate_addition_balance_tasks(
+    total: int, max_number: int, blank_w: int, shared_seen: set[str]
+) -> list[str]:
+    """Generate X + Y = W + _ with X+Y = W+answer and all of X,Y,W,answer ≤ max_number (and X+Y ≤ max_number).
+    W is never equal to X or Y."""
+    bl = "_" * blank_w
+    max_zero = max_equations_with_zero(total)
+    zero_count = 0
+    tasks: list[str] = []
+    attempts = 0
+    max_attempts = total * 500
+
+    while len(tasks) < total and attempts < max_attempts:
+        attempts += 1
+        x = random.randint(0, max_number)
+        y = random.randint(0, max_number)
+        s = x + y
+        if s > max_number:
+            continue
+        w_lo = max(0, s - max_number)
+        w_hi = min(s, max_number)
+        choices = [w for w in range(w_lo, w_hi + 1) if w not in (x, y)]
+        if not choices:
+            continue
+        w = random.choice(choices)
+        s_line = f"{x} + {y} = {w} + {bl}"
+        if s_line in shared_seen:
+            continue
+        z = equation_includes_zero_value(s_line)
+        if z and zero_count >= max_zero:
+            continue
+        shared_seen.add(s_line)
+        tasks.append(s_line)
+        if z:
+            zero_count += 1
+
+    if len(tasks) < total:
+        raise RuntimeError(
+            f"Could not generate {total} unique addition-balance tasks with at most {max_zero} "
+            f"containing 0 (max_number={max_number}). "
+            "Increase --max-number or reduce --total."
+        )
+    random.shuffle(tasks)
+    return tasks
+
+
 def format_output(sections: list[tuple[str, list[str]]], max_number: int) -> str:
     """Format exercises for text output: (section title, tasks)."""
     lines: list[str] = []
@@ -415,7 +482,12 @@ def _render_pdf_worksheet_page(
             new_x=XPos.LMARGIN,
             new_y=YPos.NEXT,
         )
-        pdf.set_font("courier", size=FONT_SIZE_BODY)
+        body_size = (
+            FONT_SIZE_BODY_ADDITION_BALANCE
+            if title == EXERCISE_TITLES[TYPE_ADDITION_BALANCE]
+            else FONT_SIZE_BODY
+        )
+        pdf.set_font("courier", size=body_size)
         pdf.ln(PDF_GAP_AFTER_TITLE)
 
         for i, task in enumerate(tasks):
@@ -509,7 +581,8 @@ def parse_exercise_type_tokens(tokens: list[str]) -> list[str]:
         if key not in EXERCISE_TYPE_ALIASES:
             valid = ", ".join(EXERCISE_TYPES_ORDER)
             aliases = (
-                "a, add, s, sub, amf, am1, ams, am2, smf, sm1, smm, sms, sm2, smt"
+                "a, add, s, sub, amf, am1, ams, am2, smf, sm1, smm, sms, sm2, smt, "
+                "ab, balance, bal"
             )
             raise ValueError(
                 f"unknown exercise type {raw!r}; use {valid}, or abbreviations: {aliases}"
@@ -534,6 +607,7 @@ def build_sections(
         TYPE_ADDITION_MISSING_SECOND: generate_addition_missing_second_addend_tasks,
         TYPE_SUBTRACTION_MISSING_MINUEND: generate_subtraction_missing_minuend_tasks,
         TYPE_SUBTRACTION_MISSING_SUBTRAHEND: generate_subtraction_missing_subtrahend_tasks,
+        TYPE_ADDITION_BALANCE: generate_addition_balance_tasks,
     }
     sections: list[tuple[str, list[str]]] = []
     for key in types:
@@ -600,8 +674,9 @@ def main() -> int:
         help=(
             "Exercise types to include (default: all). "
             "Names: addition, subtraction, addition-missing-first, addition-missing-second, "
-            "subtraction-missing-minuend, subtraction-missing-subtrahend. "
-            "Abbreviations: a, add, s, sub, amf, am1, ams, am2, smf, sm1, smm, sms, sm2, smt. "
+            "subtraction-missing-minuend, subtraction-missing-subtrahend, addition-balance. "
+            "Abbreviations: a, add, s, sub, amf, am1, ams, am2, smf, sm1, smm, sms, sm2, smt, "
+            "ab, balance, bal. "
             "Order on the worksheet follows the order given."
         ),
     )
