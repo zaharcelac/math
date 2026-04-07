@@ -32,13 +32,14 @@
 </head>
 <body>
   <h1>Grade 1 math worksheets</h1>
-  <p class="hint">Choose options and generate a printable PDF. With JavaScript on, validation messages appear without leaving the page; a successful run triggers download.</p>
+  <p class="hint">Choose options and generate a printable PDF. With JavaScript on, validation messages appear without leaving the page; a successful run downloads the file in the same request.</p>
 
   <div id="errors">
     {% include "partials/errors.html" %}
   </div>
 
   <form
+    id="generate-form"
     method="post"
     action="/generate"
     hx-post="/generate"
@@ -70,5 +71,46 @@
 
     <button type="submit">Generate PDF</button>
   </form>
+  <script>
+    /* PDF responses are binary: must set responseType on the real XHR before send().
+       htmx:configRequest runs too early (no xhr yet); htmx:beforeRequest has xhr open. */
+    document.body.addEventListener("htmx:beforeRequest", function (evt) {
+      var el = evt.detail.elt;
+      var form = el && el.closest ? el.closest("#generate-form") : null;
+      if (form) {
+        evt.detail.xhr.responseType = "arraybuffer";
+      }
+    });
+    document.body.addEventListener("htmx:beforeSwap", function (evt) {
+      var xhr = evt.detail.xhr;
+      var ct = xhr.getResponseHeader("Content-Type") || "";
+      if (ct.indexOf("application/pdf") !== -1) {
+        evt.preventDefault();
+        var buf = xhr.response;
+        var blob = new Blob([buf], { type: "application/pdf" });
+        var disp = xhr.getResponseHeader("Content-Disposition") || "";
+        var name = "worksheet.pdf";
+        var m = /filename\*=UTF-8''([^;\s]+)/i.exec(disp);
+        if (m) {
+          try { name = decodeURIComponent(m[1]); } catch (e) { name = m[1]; }
+        } else {
+          m = /filename="([^"]+)"/i.exec(disp);
+          if (m) name = m[1];
+        }
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = name;
+        a.click();
+        URL.revokeObjectURL(url);
+        return;
+      }
+      if (ct.indexOf("text/html") !== -1 && xhr.responseType === "arraybuffer") {
+        evt.preventDefault();
+        var html = new TextDecoder("utf-8").decode(xhr.response);
+        evt.detail.target.innerHTML = html;
+      }
+    });
+  </script>
 </body>
 </html>

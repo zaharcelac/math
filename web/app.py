@@ -1,18 +1,21 @@
 """
 MVP web UI: FastAPI + Jinja2 + HTMX.
 - Plain form submit returns PDF directly.
-- HTMX requests get validation errors as HTML partials; success uses HX-Redirect to /download/{token}.
+- HTMX requests get validation errors as HTML partials; success returns the same PDF body
+  (no redirect / no server-side token cache), so multiple app instances work behind a proxy
+  without sticky sessions.
 """
 from __future__ import annotations
 
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 # Project root (parent of web/)
 _ROOT = Path(__file__).resolve().parent.parent
@@ -29,18 +32,34 @@ from math_exercises import (  # noqa: E402
 
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
-# Short-lived PDF cache for HTMX redirect-after-POST (token -> bytes)
-_pdf_cache: dict[str, bytes] = {}
-
 # Reasonable limits for a public form
 MAX_TOTAL = 60
 MAX_MAX_NUMBER = 200
 MAX_SHEETS = 20
 
+
+def _trusted_proxy_hosts() -> str | list[str]:
+    """IPs/networks of proxies (e.g. Traefik) allowed to set X-Forwarded-* . Default '*' for Docker."""
+    raw = os.environ.get("TRUSTED_PROXY_IPS", "*").strip()
+    if not raw or raw == "*":
+        return "*"
+    parts = [h.strip() for h in raw.split(",") if h.strip()]
+    if not parts:
+        return "*"
+    return parts if len(parts) > 1 else parts[0]
+
+
+_root_path = os.environ.get("ROOT_PATH", "").strip()
+
 app = FastAPI(
     title="Math worksheets",
     description="Generate grade-1 style math worksheets as PDF.",
+    root_path=_root_path,
 )
+
+# Trust X-Forwarded-Proto / X-Forwarded-For from Traefik (or any front proxy) so the ASGI
+# scope matches what browsers see, without requiring extra Uvicorn CLI flags.
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=_trusted_proxy_hosts())
 
 
 def _filename_for_download() -> str:
@@ -57,7 +76,7 @@ async def index(request: Request) -> Response:
             "type_titles": EXERCISE_TITLES,
             "errors": None,
             "values": {
-                "total": 12,
+                "total": 20,
                 "max_number": 20,
                 "sheets": 1,
                 "seed": "",
@@ -69,7 +88,7 @@ async def index(request: Request) -> Response:
 
 @app.post("/generate")
 async def generate(request: Request) -> Response:
-    """Build PDF. HTMX: validation errors as partial; success → 204 + HX-Redirect to /download/{token}."""
+    """Build PDF. HTMX: errors as HTML partial (200); success returns PDF bytes like a normal POST."""
     form = await request.form()
     try:
         total = int(form.get("total", 12))
@@ -148,29 +167,6 @@ async def generate(request: Request) -> Response:
             return templates.TemplateResponse(request, "partials/errors.html", ctx)
         return templates.TemplateResponse(request, "index.html", ctx, status_code=422)
 
-    filename = _filename_for_download()
-
-    if hx:
-        token = str(uuid4())
-        _pdf_cache[token] = pdf_bytes
-        resp = Response(status_code=204)
-        resp.headers["HX-Redirect"] = str(request.url_for("download_pdf", token=token))
-        return resp
-
-    return Response(
-        content=pdf_bytes,
-        media_type="application/pdf",
-        headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
-        },
-    )
-
-
-@app.get("/download/{token}")
-async def download_pdf(request: Request, token: str) -> Response:
-    pdf_bytes = _pdf_cache.pop(token, None)
-    if pdf_bytes is None:
-        raise HTTPException(status_code=404, detail="Download expired or invalid link.")
     filename = _filename_for_download()
     return Response(
         content=pdf_bytes,

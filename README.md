@@ -24,7 +24,18 @@ From the repository root:
 uvicorn web.app:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Open http://127.0.0.1:8000 . With JavaScript enabled, validation errors update in place; on success the app redirects to a one-time download URL. Without JavaScript, submitting the form still returns the PDF as a normal file download.
+Open http://127.0.0.1:8000 . With JavaScript enabled, validation errors update in place; on success the PDF is returned in the same response (no extra download URL or server-side session). Without JavaScript, submitting the form still returns the PDF as a normal file download.
+
+### Behind a reverse proxy (e.g. Traefik)
+
+The app applies **`ProxyHeadersMiddleware`** so `X-Forwarded-Proto` / `X-Forwarded-For` from the proxy are honored without extra Uvicorn flags. You can tune trust with environment variables:
+
+| Variable | Purpose |
+|----------|---------|
+| `TRUSTED_PROXY_IPS` | Comma-separated IPs or CIDRs of proxies that may set forwarded headers. Default `*` (trust any direct client—typical in a private Docker network). Tighten in production if the app is reachable without the proxy. |
+| `ROOT_PATH` | If the app is mounted under a URL prefix **without** the proxy stripping it (uncommon), set this to that prefix (e.g. `/math`) so OpenAPI and path helpers stay correct. Usually leave unset when Traefik strips the prefix before the request hits Uvicorn. |
+
+No sticky sessions or Traefik-specific download routes are required: PDF bytes are returned directly from `POST /generate`.
 
 ## Quick start
 
