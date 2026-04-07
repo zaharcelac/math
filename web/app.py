@@ -148,7 +148,12 @@ async def generate(request: Request) -> Response:
 
     try:
         pdf_bytes = generate_workbook_pdf_bytes(
-            exercise_types, total, max_number, sheets, seed_val
+            exercise_types,
+            total,
+            max_number,
+            sheets,
+            seed_val,
+            footer_url=str(request.base_url),
         )
     except RuntimeError as e:
         ctx = {

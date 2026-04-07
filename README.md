@@ -97,6 +97,7 @@ python3 math_exercises.py --types addition subtraction-missing-minuend --total 8
 - **Footer (every page):** centered line of the form  
   `TEST i OF n   MAX-NUMBER …   TOTAL …`  
   where `i`/`n` come from `--sheets`, and the last two fields mirror `--max-number` and `--total`.
+- **Footer URL (optional):** when resolved, the URL is appended on the **same** centered line as `TEST … MAX-NUMBER … TOTAL …`. Order of precedence: `WORKSHEET_FOOTER_URL`, `PUBLIC_BASE_URL`, the request’s `base_url` (web app), then `DEFAULT_WORKSHEET_FOOTER_URL` in `math_exercises.py`. Env overrides everything else.
 
 With `--print` and `--sheets` greater than 1, stdout shows only the **first** worksheet; the PDF contains all sheets.
 

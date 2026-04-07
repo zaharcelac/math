@@ -10,6 +10,7 @@ import argparse
 from collections.abc import Callable
 from datetime import datetime
 import math
+import os
 import random
 import sys
 from pathlib import Path
@@ -22,13 +23,18 @@ FONT_SIZE_BODY_ADDITION_BALANCE = 22
 FONT_SIZE_BODY_SUBTRACTION_BALANCE = 22
 FONT_SIZE_SHEET_FOOTER = 10
 
-# Footer line for "TEST x OF y" (mm)
+# Footer line for "TEST x OF y" (mm); optional URL is on the same line
 PDF_SHEET_FOOTER_FROM_BOTTOM = 12
 PDF_SHEET_FOOTER_LINE_HEIGHT = 5
 # Reserve this much space from the bottom for the footer + auto page-break margin (content stays above)
 PDF_FOOTER_ZONE_MM = (
     PDF_SHEET_FOOTER_FROM_BOTTOM + PDF_SHEET_FOOTER_LINE_HEIGHT + 3
 )
+
+# Fallback when env vars are unset and there is no ``request_base`` (e.g. CLI ``--print``).
+# After ``WORKSHEET_FOOTER_URL``, ``PUBLIC_BASE_URL``, and ``request_base`` in
+# :func:`resolve_worksheet_footer_url`.
+DEFAULT_WORKSHEET_FOOTER_URL = "<URL HERE>"
 
 # PDF vertical spacing (line height / gaps); multiplied by this factor vs previous defaults
 PDF_LINE_SPACING_FACTOR = 2.5
@@ -109,6 +115,25 @@ def default_pdf_output_path() -> Path:
     """Default PDF path: output/math_exercises_YYYY-MM-DD_HH-MM.pdf (local time)."""
     ts = datetime.now().strftime("%Y-%m-%d_%H-%M")
     return Path("output") / f"math_exercises_{ts}.pdf"
+
+
+def resolve_worksheet_footer_url(request_base: str | None = None) -> str | None:
+    """URL for the PDF footer.
+
+    Priority: ``WORKSHEET_FOOTER_URL``, ``PUBLIC_BASE_URL``, ``request_base`` (e.g. web
+    ``str(request.base_url)``), then :data:`DEFAULT_WORKSHEET_FOOTER_URL`. The code default
+    must not run before ``request_base`` or the web UI would show a placeholder instead of
+    the real origin.
+    """
+    for key in ("WORKSHEET_FOOTER_URL", "PUBLIC_BASE_URL"):
+        raw = os.environ.get(key)
+        if raw and raw.strip():
+            return raw.strip().rstrip("/")
+    if request_base and str(request_base).strip():
+        return str(request_base).strip().rstrip("/")
+    if DEFAULT_WORKSHEET_FOOTER_URL and DEFAULT_WORKSHEET_FOOTER_URL.strip():
+        return DEFAULT_WORKSHEET_FOOTER_URL.strip().rstrip("/")
+    return None
 
 
 def digit_slots(max_number: int) -> int:
@@ -504,21 +529,23 @@ def _render_pdf_sheet_footer(
     test_count: int,
     max_number: int,
     tasks_per_type: int,
+    footer_url: str | None = None,
 ) -> None:
-    """Draw TEST x OF y and max-number / total at bottom of current page."""
+    """Draw TEST x OF y, max-number, total, and optional URL on one footer line."""
     from fpdf.enums import XPos, YPos
 
     label = (
         f"TEST {test_index} OF {test_count}   "
         f"MAX-NUMBER {max_number}   TOTAL {tasks_per_type}"
     )
+    text = f"{label}   {footer_url}" if footer_url else label
     pdf.set_auto_page_break(auto=False)
     pdf.set_y(-PDF_SHEET_FOOTER_FROM_BOTTOM)
     pdf.set_font("courier", size=FONT_SIZE_SHEET_FOOTER)
-    pdf.cell(
+    pdf.multi_cell(
         0,
         PDF_SHEET_FOOTER_LINE_HEIGHT,
-        label,
+        text,
         align="C",
         new_x=XPos.LMARGIN,
         new_y=YPos.NEXT,
@@ -533,6 +560,7 @@ def _render_pdf_worksheet_page(
     tasks_per_type: int,
     test_index: int,
     test_count: int,
+    footer_url: str | None = None,
 ) -> None:
     """Draw one worksheet: each exercise type on its own page; footer on every page."""
     from fpdf.enums import XPos, YPos
@@ -568,7 +596,7 @@ def _render_pdf_worksheet_page(
             pdf.cell(width, PDF_CELL_TASK_HEIGHT, line, align=cell_align)
 
         _render_pdf_sheet_footer(
-            pdf, test_index, test_count, max_number, tasks_per_type
+            pdf, test_index, test_count, max_number, tasks_per_type, footer_url
         )
 
 
@@ -576,6 +604,7 @@ def _build_pdf_document(
     pages_sections: list[list[tuple[str, list[str]]]],
     max_number: int,
     tasks_per_type: int,
+    footer_url: str | None = None,
 ):
     """Build in-memory FPDF workbook (US Letter)."""
     from fpdf import FPDF
@@ -585,7 +614,7 @@ def _build_pdf_document(
     test_count = len(pages_sections)
     for idx, sections in enumerate(pages_sections, start=1):
         _render_pdf_worksheet_page(
-            pdf, sections, max_number, tasks_per_type, idx, test_count
+            pdf, sections, max_number, tasks_per_type, idx, test_count, footer_url
         )
     return pdf
 
@@ -594,9 +623,10 @@ def generate_pdf_bytes(
     pages_sections: list[list[tuple[str, list[str]]]],
     max_number: int,
     tasks_per_type: int,
+    footer_url: str | None = None,
 ) -> bytes:
     """Render workbook to PDF bytes (same layout as file output)."""
-    pdf = _build_pdf_document(pages_sections, max_number, tasks_per_type)
+    pdf = _build_pdf_document(pages_sections, max_number, tasks_per_type, footer_url)
     raw = pdf.output(dest="S")
     return bytes(raw)
 
@@ -606,9 +636,10 @@ def generate_pdf(
     output_path: Path,
     max_number: int,
     tasks_per_type: int,
+    footer_url: str | None = None,
 ) -> None:
     """Write workbook PDF to disk."""
-    pdf = _build_pdf_document(pages_sections, max_number, tasks_per_type)
+    pdf = _build_pdf_document(pages_sections, max_number, tasks_per_type, footer_url)
     pdf.output(str(output_path))
 
 
@@ -634,10 +665,16 @@ def generate_workbook_pdf_bytes(
     max_number: int,
     sheets: int,
     seed: int | None,
+    footer_url: str | None = None,
 ) -> bytes:
-    """High-level: validate inputs via same generators as CLI; return PDF bytes."""
+    """High-level: validate inputs via same generators as CLI; return PDF bytes.
+
+    ``footer_url`` is passed to :func:`resolve_worksheet_footer_url` (e.g. ``str(request.base_url)``
+    from the web app). For CLI, omit it and use env vars and/or :data:`DEFAULT_WORKSHEET_FOOTER_URL`.
+    """
     pages = build_workbook_pages(exercise_types, total, max_number, sheets, seed)
-    return generate_pdf_bytes(pages, max_number, total)
+    resolved = resolve_worksheet_footer_url(footer_url)
+    return generate_pdf_bytes(pages, max_number, total, footer_url=resolved)
 
 
 def parse_exercise_type_tokens(tokens: list[str]) -> list[str]:
@@ -797,7 +834,13 @@ def main() -> int:
         try:
             pdf_path = args.output if args.output is not None else default_pdf_output_path()
             pdf_path.parent.mkdir(parents=True, exist_ok=True)
-            generate_pdf(pages, pdf_path, args.max_number, args.total)
+            generate_pdf(
+                pages,
+                pdf_path,
+                args.max_number,
+                args.total,
+                footer_url=resolve_worksheet_footer_url(),
+            )
             print(f"\nPDF saved to: {pdf_path}", file=sys.stderr)
         except ImportError as e:
             print(
