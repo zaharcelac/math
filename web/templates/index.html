@@ -25,6 +25,9 @@
     .types-grid label { font-weight: normal; }
     button { padding: 0.5rem 1rem; font-size: 1rem; cursor: pointer; border-radius: 6px; border: 1px solid #2563eb; background: #2563eb; color: #fff; }
     button:hover { background: #1d4ed8; border-color: #1d4ed8; }
+    .types-toolbar { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem; }
+    button.type-tool { padding: 0.35rem 0.75rem; font-size: 0.9rem; border: 1px solid #94a3b8; background: #fff; color: #334155; }
+    button.type-tool:hover { background: #f1f5f9; border-color: #64748b; }
     .hint { font-size: 0.85rem; color: #555; margin: 0.25rem 0 0; }
     .errors { background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 0.5rem 1rem; margin-bottom: 1rem; }
     .errors ul { margin: 0; padding-left: 1.25rem; }
@@ -59,6 +62,10 @@
 
     <fieldset>
       <legend>Exercise types</legend>
+      <div class="types-toolbar">
+        <button type="button" class="type-tool" id="types-select-all">Select all</button>
+        <button type="button" class="type-tool" id="types-select-none">Select none</button>
+      </div>
       <div class="types-grid">
         {% for t in types_order %}
         <label>
@@ -72,6 +79,26 @@
     <button type="submit">Generate PDF</button>
   </form>
   <script>
+    (function () {
+      var form = document.getElementById("generate-form");
+      if (!form) return;
+      function typeBoxes() {
+        return form.querySelectorAll('input[name="types"]');
+      }
+      var allBtn = document.getElementById("types-select-all");
+      var noneBtn = document.getElementById("types-select-none");
+      if (allBtn) {
+        allBtn.addEventListener("click", function () {
+          typeBoxes().forEach(function (cb) { cb.checked = true; });
+        });
+      }
+      if (noneBtn) {
+        noneBtn.addEventListener("click", function () {
+          typeBoxes().forEach(function (cb) { cb.checked = false; });
+        });
+      }
+    })();
+
     /* PDF responses are binary: must set responseType on the real XHR before send().
        htmx:configRequest runs too early (no xhr yet); htmx:beforeRequest has xhr open. */
     document.body.addEventListener("htmx:beforeRequest", function (evt) {
