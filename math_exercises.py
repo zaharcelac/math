@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Callable
+from datetime import datetime
 import math
 import random
 import sys
@@ -84,6 +85,12 @@ EXERCISE_TYPE_ALIASES: dict[str, str] = {
     "sm2": TYPE_SUBTRACTION_MISSING_SUBTRAHEND,
     "smt": TYPE_SUBTRACTION_MISSING_SUBTRAHEND,
 }
+
+
+def default_pdf_output_path() -> Path:
+    """Default PDF path: output/math_exercises_YYYY-MM-DD_HH-MM.pdf (local time)."""
+    ts = datetime.now().strftime("%Y-%m-%d_%H-%M")
+    return Path("output") / f"math_exercises_{ts}.pdf"
 
 
 def digit_slots(max_number: int) -> int:
@@ -520,8 +527,11 @@ def main() -> int:
         "--output",
         "-o",
         type=Path,
-        default=Path("math_exercises.pdf"),
-        help="Output PDF path when --print is used (default: math_exercises.pdf)",
+        default=None,
+        help=(
+            "Output PDF path when --print is used (default: "
+            "output/math_exercises_YYYY-MM-DD_HH-MM.pdf using current local time)"
+        ),
     )
     parser.add_argument(
         "--sheets",
@@ -592,8 +602,10 @@ def main() -> int:
                 file=sys.stderr,
             )
         try:
-            generate_pdf(pages, args.output, args.max_number, args.total)
-            print(f"\nPDF saved to: {args.output}", file=sys.stderr)
+            pdf_path = args.output if args.output is not None else default_pdf_output_path()
+            pdf_path.parent.mkdir(parents=True, exist_ok=True)
+            generate_pdf(pages, pdf_path, args.max_number, args.total)
+            print(f"\nPDF saved to: {pdf_path}", file=sys.stderr)
         except ImportError as e:
             print(
                 f"Error: PDF generation requires fpdf2. Install with: pip install fpdf2\n{e}",

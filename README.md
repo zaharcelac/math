@@ -19,7 +19,10 @@ pip install -r requirements.txt
 # Text only (default: all exercise types, 12 tasks each, max operand 20)
 python3 math_exercises.py
 
-# PDF for printing
+# PDF for printing (default file: output/math_exercises_YYYY-MM-DD_HH-MM.pdf)
+python3 math_exercises.py --print
+
+# PDF at an explicit path
 python3 math_exercises.py --print -o worksheet.pdf
 
 # Fewer tasks, larger numbers, only addition and subtraction
@@ -34,7 +37,7 @@ python3 math_exercises.py --total 10 --max-number 50 --types a s --print
 | `--max-number N` | No operand or sum/difference may exceed this bound (default: 20). Blanks use as many underscores as there are digits in `N`. |
 | `--types TYPE …` | Which exercise kinds to include (default: **all**). Order in the PDF follows the order you list. See [Exercise types](#exercise-types). |
 | `--print` | Write a PDF (requires fpdf2). |
-| `-o` / `--output PATH` | PDF output path (default: `math_exercises.pdf`). |
+| `-o` / `--output PATH` | PDF output path. If omitted with `--print`, default is `output/math_exercises_YYYY-MM-DD_HH-MM.pdf` (local time). The `output` directory is created if needed. |
 | `--sheets N` | With `--print`, generate **N** independent worksheets in one PDF (each fully regenerated). Footer shows `TEST i OF N`. Ignored without `--print`. |
 | `--seed N` | Fixed RNG seed. With `--print` and multiple sheets, sheet *i* uses seed `N + i`. |
 
