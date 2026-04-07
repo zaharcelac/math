@@ -432,13 +432,12 @@ def _render_pdf_worksheet_page(
         )
 
 
-def generate_pdf(
+def _build_pdf_document(
     pages_sections: list[list[tuple[str, list[str]]]],
-    output_path: Path,
     max_number: int,
     tasks_per_type: int,
-) -> None:
-    """Generate PDF (US Letter): each exercise type starts a new page; footer with TEST and params."""
+):
+    """Build in-memory FPDF workbook (US Letter)."""
     from fpdf import FPDF
 
     pdf = FPDF(format="letter")
@@ -448,8 +447,57 @@ def generate_pdf(
         _render_pdf_worksheet_page(
             pdf, sections, max_number, tasks_per_type, idx, test_count
         )
+    return pdf
 
+
+def generate_pdf_bytes(
+    pages_sections: list[list[tuple[str, list[str]]]],
+    max_number: int,
+    tasks_per_type: int,
+) -> bytes:
+    """Render workbook to PDF bytes (same layout as file output)."""
+    pdf = _build_pdf_document(pages_sections, max_number, tasks_per_type)
+    raw = pdf.output(dest="S")
+    return bytes(raw)
+
+
+def generate_pdf(
+    pages_sections: list[list[tuple[str, list[str]]]],
+    output_path: Path,
+    max_number: int,
+    tasks_per_type: int,
+) -> None:
+    """Write workbook PDF to disk."""
+    pdf = _build_pdf_document(pages_sections, max_number, tasks_per_type)
     pdf.output(str(output_path))
+
+
+def build_workbook_pages(
+    exercise_types: list[str],
+    total: int,
+    max_number: int,
+    sheets: int,
+    seed: int | None,
+) -> list[list[tuple[str, list[str]]]]:
+    """Build all worksheet page lists (one per --sheets), same logic as CLI."""
+    pages: list[list[tuple[str, list[str]]]] = []
+    for i in range(sheets):
+        if seed is not None:
+            random.seed(seed + i)
+        pages.append(build_sections(exercise_types, total, max_number))
+    return pages
+
+
+def generate_workbook_pdf_bytes(
+    exercise_types: list[str],
+    total: int,
+    max_number: int,
+    sheets: int,
+    seed: int | None,
+) -> bytes:
+    """High-level: validate inputs via same generators as CLI; return PDF bytes."""
+    pages = build_workbook_pages(exercise_types, total, max_number, sheets, seed)
+    return generate_pdf_bytes(pages, max_number, total)
 
 
 def parse_exercise_type_tokens(tokens: list[str]) -> list[str]:

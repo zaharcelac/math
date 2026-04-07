@@ -6,12 +6,25 @@
 
 - **Python 3.9+** (uses `list[str]` style annotations with `from __future__ import annotations` for broader compatibility)
 - **PDF output:** [fpdf2](https://pypi.org/project/fpdf2/) (see `requirements.txt`)
+- **Web UI (optional):** FastAPI, Uvicorn, Jinja2, python-multipart (same `requirements.txt`)
 
 ## Install
 
 ```bash
 pip install -r requirements.txt
 ```
+
+## Web UI (MVP)
+
+Small browser UI with **FastAPI** and **HTMX**: fill the form, get a PDF download. The CLI below is unchanged for scripts and cron.
+
+From the repository root:
+
+```bash
+uvicorn web.app:app --reload --host 127.0.0.1 --port 8000
+```
+
+Open http://127.0.0.1:8000 . With JavaScript enabled, validation errors update in place; on success the app redirects to a one-time download URL. Without JavaScript, submitting the form still returns the PDF as a normal file download.
 
 ## Quick start
 

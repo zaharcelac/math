@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Math worksheets</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <style>
+    :root {
+      font-family: system-ui, sans-serif;
+      line-height: 1.5;
+      color: #1a1a1a;
+      background: #f6f7f9;
+    }
+    body { margin: 0 auto; max-width: 40rem; padding: 1.5rem; }
+    h1 { font-size: 1.35rem; margin-top: 0; }
+    fieldset { border: 1px solid #ccc; border-radius: 6px; padding: 0.75rem 1rem; margin: 0 0 1rem; background: #fff; }
+    legend { padding: 0 0.35rem; font-weight: 600; }
+    label { display: block; margin: 0.35rem 0; }
+    .row { display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; align-items: baseline; margin: 0.5rem 0; }
+    .row label { margin: 0; }
+    input[type="number"], input[type="text"] { width: 6rem; padding: 0.35rem 0.5rem; }
+    input[type="text"]#seed { width: 10rem; }
+    .types-grid { display: grid; gap: 0.35rem; }
+    .types-grid label { font-weight: normal; }
+    button { padding: 0.5rem 1rem; font-size: 1rem; cursor: pointer; border-radius: 6px; border: 1px solid #2563eb; background: #2563eb; color: #fff; }
+    button:hover { background: #1d4ed8; border-color: #1d4ed8; }
+    .hint { font-size: 0.85rem; color: #555; margin: 0.25rem 0 0; }
+    .errors { background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 0.5rem 1rem; margin-bottom: 1rem; }
+    .errors ul { margin: 0; padding-left: 1.25rem; }
+  </style>
+</head>
+<body>
+  <h1>Grade 1 math worksheets</h1>
+  <p class="hint">Choose options and generate a printable PDF. With JavaScript on, validation messages appear without leaving the page; a successful run triggers download.</p>
+
+  <div id="errors">
+    {% include "partials/errors.html" %}
+  </div>
+
+  <form
+    method="post"
+    action="/generate"
+    hx-post="/generate"
+    hx-target="#errors"
+    hx-swap="innerHTML"
+  >
+    <fieldset>
+      <legend>Layout</legend>
+      <div class="row">
+        <label>Problems per type <input type="number" name="total" min="1" max="60" value="{{ values.total }}" required /></label>
+        <label>Max number <input type="number" name="max_number" min="0" max="200" value="{{ values.max_number }}" required /></label>
+        <label>Sheets <input type="number" name="sheets" min="1" max="20" value="{{ values.sheets }}" required /></label>
+      </div>
+      <label>Seed <input type="text" name="seed" id="seed" value="{{ values.seed }}" placeholder="optional integer" autocomplete="off" /></label>
+      <p class="hint">Same seed + options yields the same worksheet sequence.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Exercise types</legend>
+      <div class="types-grid">
+        {% for t in types_order %}
+        <label>
+          <input type="checkbox" name="types" value="{{ t }}" {% if t in selected_types %}checked{% endif %} />
+          {{ type_titles[t] }}
+        </label>
+        {% endfor %}
+      </div>
+    </fieldset>
+
+    <button type="submit">Generate PDF</button>
+  </form>
+</body>
+</html>
