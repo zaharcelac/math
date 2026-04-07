@@ -117,8 +117,8 @@ EXERCISE_TYPE_ALIASES: dict[str, str] = {
 
 
 def default_pdf_output_path() -> Path:
-    """Default PDF path: output/math_exercises_YYYY-MM-DD_HH-MM.pdf (local time)."""
-    ts = datetime.now().strftime("%Y-%m-%d_%H-%M")
+    """Default PDF path: output/math_exercises_YYYY-MM-DD_HH-MM-SS.pdf (local time)."""
+    ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     return Path("output") / f"math_exercises_{ts}.pdf"
 
 
@@ -846,7 +846,7 @@ def main() -> int:
         default=None,
         help=(
             "Output PDF path when --print is used (default: "
-            "output/math_exercises_YYYY-MM-DD_HH-MM.pdf using current local time)"
+            "output/math_exercises_YYYY-MM-DD_HH-MM-SS.pdf using current local time)"
         ),
     )
     parser.add_argument(
