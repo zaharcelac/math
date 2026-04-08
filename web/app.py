@@ -5,6 +5,8 @@ MVP web UI: FastAPI + Jinja2 + HTMX.
   (no redirect / no server-side token cache), so multiple app instances work behind a proxy
   without sticky sessions.
 - POST /generate is rate-limited (slowapi); tune with RATE_LIMIT_GENERATE.
+- Security headers on all responses (CSP for HTMX + unpkg, frame protection, etc.); tune with
+  WEB_EXPOSE_DOCS and WEB_HSTS_MAX_AGE.
 """
 from __future__ import annotations
 
@@ -16,6 +18,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.base import BaseHTTPMiddleware
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -62,10 +65,63 @@ def _trusted_proxy_hosts() -> str | list[str]:
 
 _root_path = os.environ.get("ROOT_PATH", "").strip()
 
+# OpenAPI UI: disable in production (set WEB_EXPOSE_DOCS=0).
+_expose_docs_raw = os.environ.get("WEB_EXPOSE_DOCS", "1").strip().lower()
+EXPOSE_OPENAPI_DOCS = _expose_docs_raw in ("1", "true", "yes")
+
+# Optional HSTS (set only when the app is served only over HTTPS, e.g. behind TLS termination).
+def _hsts_header() -> dict[str, str]:
+    raw = os.environ.get("WEB_HSTS_MAX_AGE", "").strip()
+    if not raw:
+        return {}
+    try:
+        age = int(raw)
+    except ValueError:
+        return {}
+    if age <= 0:
+        return {}
+    return {"Strict-Transport-Security": f"max-age={age}; includeSubDomains"}
+
+
+# Matches index.html: HTMX from unpkg, inline script/style on the form page.
+_CSP = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline' https://unpkg.com; "
+    "style-src 'self' 'unsafe-inline'; "
+    "connect-src 'self'; "
+    "form-action 'self'; "
+    "base-uri 'self'; "
+    "frame-ancestors 'none'; "
+    "img-src 'self' data: blob:; "
+    "font-src 'self' data:; "
+    "object-src 'none'"
+)
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Baseline browser hardening on every response."""
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = (
+            "accelerometer=(), camera=(), geolocation=(), microphone=(), payment=(), usb=()"
+        )
+        response.headers["Cross-Origin-Resource-Policy"] = "same-site"
+        response.headers["Content-Security-Policy"] = _CSP
+        response.headers.update(_hsts_header())
+        return response
+
+
 app = FastAPI(
     title="Math worksheets",
     description="Generate grade-1 style math worksheets as PDF.",
     root_path=_root_path,
+    docs_url="/docs" if EXPOSE_OPENAPI_DOCS else None,
+    redoc_url="/redoc" if EXPOSE_OPENAPI_DOCS else None,
+    openapi_url="/openapi.json" if EXPOSE_OPENAPI_DOCS else None,
 )
 app.state.limiter = limiter
 
@@ -96,8 +152,10 @@ def _rate_limit_handler(request: Request, exc: RateLimitExceeded) -> Response:
 app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
 
 
-# Middleware order: last registered is outermost. ProxyHeaders runs first so client IP matches
-# the real visitor before slowapi counts requests (important behind Traefik/nginx).
+# Middleware order: last registered is outermost.
+# ProxyHeaders runs first on the request so client IP matches the real visitor before slowapi.
+# SecurityHeaders sits inside Proxy+SlowAPI so all responses (including errors) get headers.
+app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=_trusted_proxy_hosts())
 

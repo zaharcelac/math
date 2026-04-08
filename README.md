@@ -24,17 +24,21 @@ From the repository root:
 uvicorn web.app:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Open http://127.0.0.1:8000 . With JavaScript enabled, validation errors update in place; on success the PDF is returned in the same response (no extra download URL or server-side session). Without JavaScript, submitting the form still returns the PDF as a normal file download.
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000) . With JavaScript enabled, validation errors update in place; on success the PDF is returned in the same response (no extra download URL or server-side session). Without JavaScript, submitting the form still returns the PDF as a normal file download.
 
 ### Behind a reverse proxy (e.g. Traefik)
 
-The app applies **`ProxyHeadersMiddleware`** so `X-Forwarded-Proto` / `X-Forwarded-For` from the proxy are honored without extra Uvicorn flags. You can tune trust with environment variables:
+The app applies `**ProxyHeadersMiddleware**` so `X-Forwarded-Proto` / `X-Forwarded-For` from the proxy are honored without extra Uvicorn flags. You can tune trust with environment variables:
 
-| Variable | Purpose |
-|----------|---------|
-| `TRUSTED_PROXY_IPS` | Comma-separated IPs or CIDRs of proxies that may set forwarded headers. Default `*` (trust any direct client—typical in a private Docker network). Tighten in production if the app is reachable without the proxy. |
-| `ROOT_PATH` | If the app is mounted under a URL prefix **without** the proxy stripping it (uncommon), set this to that prefix (e.g. `/math`) so OpenAPI and path helpers stay correct. Usually leave unset when Traefik strips the prefix before the request hits Uvicorn. |
+
+| Variable              | Purpose                                                                                                                                                                                                                                                                                                                                                 |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TRUSTED_PROXY_IPS`   | Comma-separated IPs or CIDRs of proxies that may set forwarded headers. Default `*` (trust any direct client—typical in a private Docker network). Tighten in production if the app is reachable without the proxy.                                                                                                                                     |
+| `ROOT_PATH`           | If the app is mounted under a URL prefix **without** the proxy stripping it (uncommon), set this to that prefix (e.g. `/math`) so OpenAPI and path helpers stay correct. Usually leave unset when Traefik strips the prefix before the request hits Uvicorn.                                                                                            |
 | `RATE_LIMIT_GENERATE` | Max PDF generations per client IP per window for `POST /generate` (slowapi / [limits](https://limits.readthedocs.io/en/stable/quickstart.html#rate-limit-string-notation) string, e.g. `30/minute`, `100/hour`). Default `30/minute`. Counts are in-process memory (each Uvicorn worker has its own counter unless you later configure shared storage). |
+| `WEB_EXPOSE_DOCS`     | If `0`/`false`/`no`, hides `/docs`, `/redoc`, and `/openapi.json`. Default `1` (expose OpenAPI in development). Set to `0` in production if you do not want the API surface advertised.                                                                                                                                                                 |
+| `WEB_HSTS_MAX_AGE`    | If set to a positive integer (seconds), sends `Strict-Transport-Security` with that `max-age` and `includeSubDomains`. Leave unset for local HTTP or when the reverse proxy already sets HSTS.                                                                                                                                                          |
+
 
 No sticky sessions or Traefik-specific download routes are required: PDF bytes are returned directly from `POST /generate`.
 
@@ -56,15 +60,17 @@ python3 math_exercises.py --total 10 --max-number 50 --types a s --print
 
 ## Command-line options
 
-| Option | Meaning |
-|--------|---------|
-| `--total N` | Number of problems **per selected type** (default: 12). |
-| `--max-number N` | No operand or sum/difference may exceed this bound (default: 20). Blanks use as many underscores as there are digits in `N`. |
-| `--types TYPE …` | Which exercise kinds to include (default: **all**). Order in the PDF follows the order you list. See [Exercise types](#exercise-types). |
-| `--print` | Write a PDF (requires fpdf2). |
+
+| Option                 | Meaning                                                                                                                                                           |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--total N`            | Number of problems **per selected type** (default: 12).                                                                                                           |
+| `--max-number N`       | No operand or sum/difference may exceed this bound (default: 20). Blanks use as many underscores as there are digits in `N`.                                      |
+| `--types TYPE …`       | Which exercise kinds to include (default: **all**). Order in the PDF follows the order you list. See [Exercise types](#exercise-types).                           |
+| `--print`              | Write a PDF (requires fpdf2).                                                                                                                                     |
 | `-o` / `--output PATH` | PDF output path. If omitted with `--print`, default is `output/math_exercises_YYYY-MM-DD_HH-MM-SS.pdf` (local time). The `output` directory is created if needed. |
-| `--sheets N` | With `--print`, generate **N** independent worksheets in one PDF (each fully regenerated). Footer shows `TEST i OF N`. Ignored without `--print`. |
-| `--seed N` | Fixed RNG seed. With `--print` and multiple sheets, sheet *i* uses seed `N + i`. |
+| `--sheets N`           | With `--print`, generate **N** independent worksheets in one PDF (each fully regenerated). Footer shows `TEST i OF N`. Ignored without `--print`.                 |
+| `--seed N`             | Fixed RNG seed. With `--print` and multiple sheets, sheet *i* uses seed `N + i`.                                                                                  |
+
 
 Run `python3 math_exercises.py -h` for built-in help.
 
@@ -72,16 +78,18 @@ Run `python3 math_exercises.py -h` for built-in help.
 
 Each type uses `--total` problems. Default order when `--types` is omitted:
 
-| Type key | Abbreviations | Pattern |
-|----------|---------------|---------|
-| `addition` | `a`, `add` | `a + b = __` |
-| `subtraction` | `s`, `sub` | `a - b = __` |
-| `addition-missing-first` | `amf`, `am1` | `__ + b = c` |
-| `addition-missing-second` | `ams`, `am2` | `a + __ = c` |
-| `subtraction-missing-minuend` | `smf`, `sm1`, `smm` | `__ - b = c` |
-| `subtraction-missing-subtrahend` | `sms`, `sm2`, `smt` | `a - __ = c` |
-| `addition-balance` | `ab`, `balance`, `bal` | `a + b = c + __` (same sum both sides; all values ≤ max-number) |
-| `subtraction-balance` | `sb`, `subbalance`, `subbal` | `a - b = c - __` (same difference both sides; all values ≤ max-number) |
+
+| Type key                         | Abbreviations                | Pattern                                                                |
+| -------------------------------- | ---------------------------- | ---------------------------------------------------------------------- |
+| `addition`                       | `a`, `add`                   | `a + b = __`                                                           |
+| `subtraction`                    | `s`, `sub`                   | `a - b = __`                                                           |
+| `addition-missing-first`         | `amf`, `am1`                 | `__ + b = c`                                                           |
+| `addition-missing-second`        | `ams`, `am2`                 | `a + __ = c`                                                           |
+| `subtraction-missing-minuend`    | `smf`, `sm1`, `smm`          | `__ - b = c`                                                           |
+| `subtraction-missing-subtrahend` | `sms`, `sm2`, `smt`          | `a - __ = c`                                                           |
+| `addition-balance`               | `ab`, `balance`, `bal`       | `a + b = c + __` (same sum both sides; all values ≤ max-number)        |
+| `subtraction-balance`            | `sb`, `subbalance`, `subbal` | `a - b = c - __` (same difference both sides; all values ≤ max-number) |
+
 
 Example:
 
@@ -96,8 +104,8 @@ python3 math_exercises.py --types addition subtraction-missing-minuend --total 8
 - **Alignment:** Operands and blanks are padded to the width of `--max-number` so `+`, `-`, and `=` line up.
 - **Structure:** Each **exercise type** starts on a **new page** within a worksheet.
 - **Footer (every page):** centered line of the form  
-  `TEST i OF n   MAX-NUMBER …   TOTAL …`  
-  where `i`/`n` come from `--sheets`, and the last two fields mirror `--max-number` and `--total`.
+`TEST i OF n   MAX-NUMBER …   TOTAL …`  
+where `i`/`n` come from `--sheets`, and the last two fields mirror `--max-number` and `--total`.
 - **Footer URL (optional):** when resolved, the URL is appended on the **same** centered line as `TEST … MAX-NUMBER … TOTAL …`, and a **small QR code** is drawn under that line encoding the **same** URL string. Order of precedence: `WORKSHEET_FOOTER_URL`, `PUBLIC_BASE_URL`, the request’s `base_url` (web app), then `DEFAULT_WORKSHEET_FOOTER_URL` in `math_exercises.py`. Env overrides everything else.
 
 With `--print` and `--sheets` greater than 1, stdout shows only the **first** worksheet; the PDF contains all sheets.
@@ -112,10 +120,12 @@ Within each worksheet (one run of `build_sections`):
 
 ## Files
 
-| File | Role |
-|------|------|
-| `math_exercises.py` | CLI and generator |
-| `requirements.txt` | `fpdf2` and `qrcode[pil]` for `--print` (PDF + footer QR) |
+
+| File                | Role                                                      |
+| ------------------- | --------------------------------------------------------- |
+| `math_exercises.py` | CLI and generator                                         |
+| `requirements.txt`  | `fpdf2` and `qrcode[pil]` for `--print` (PDF + footer QR) |
+
 
 ## License
 
@@ -147,3 +157,4 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 For more information, please refer to <https://unlicense.org/>
 ```
+
