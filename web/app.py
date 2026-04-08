@@ -4,6 +4,7 @@ MVP web UI: FastAPI + Jinja2 + HTMX.
 - HTMX requests get validation errors as HTML partials; success returns the same PDF body
   (no redirect / no server-side token cache), so multiple app instances work behind a proxy
   without sticky sessions.
+- POST /generate is rate-limited (slowapi); tune with RATE_LIMIT_GENERATE.
 """
 from __future__ import annotations
 
@@ -13,8 +14,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.util import get_remote_address
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 # Project root (parent of web/)
@@ -37,6 +42,12 @@ MAX_TOTAL = 60
 MAX_MAX_NUMBER = 200
 MAX_SHEETS = 20
 
+# PDF generation is CPU-heavy; default caps requests per client IP (see slowapi / limits syntax).
+_RATE_LIMIT_GENERATE_RAW = os.environ.get("RATE_LIMIT_GENERATE", "30/minute").strip()
+RATE_LIMIT_GENERATE = _RATE_LIMIT_GENERATE_RAW or "30/minute"
+
+limiter = Limiter(key_func=get_remote_address)
+
 
 def _trusted_proxy_hosts() -> str | list[str]:
     """IPs/networks of proxies (e.g. Traefik) allowed to set X-Forwarded-* . Default '*' for Docker."""
@@ -56,9 +67,38 @@ app = FastAPI(
     description="Generate grade-1 style math worksheets as PDF.",
     root_path=_root_path,
 )
+app.state.limiter = limiter
 
-# Trust X-Forwarded-Proto / X-Forwarded-For from Traefik (or any front proxy) so the ASGI
-# scope matches what browsers see, without requiring extra Uvicorn CLI flags.
+
+def _rate_limit_handler(request: Request, exc: RateLimitExceeded) -> Response:
+    """429 with JSON or HTMX-friendly HTML; preserve slowapi rate-limit headers."""
+    hx = request.headers.get("HX-Request") == "true"
+    if hx:
+        body = (
+            '<div class="errors" role="alert"><ul>'
+            "<li>Too many worksheet requests. Please wait before trying again.</li>"
+            "</ul></div>"
+        )
+        response: Response = HTMLResponse(body, status_code=429)
+    else:
+        response = JSONResponse(
+            {
+                "detail": "Rate limit exceeded. Please wait before generating another PDF.",
+            },
+            status_code=429,
+        )
+    view = getattr(request.state, "view_rate_limit", None)
+    if view is not None:
+        response = request.app.state.limiter._inject_headers(response, view)
+    return response
+
+
+app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
+
+
+# Middleware order: last registered is outermost. ProxyHeaders runs first so client IP matches
+# the real visitor before slowapi counts requests (important behind Traefik/nginx).
+app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=_trusted_proxy_hosts())
 
 
@@ -87,6 +127,7 @@ async def index(request: Request) -> Response:
 
 
 @app.post("/generate")
+@limiter.limit(RATE_LIMIT_GENERATE)
 async def generate(request: Request) -> Response:
     """Build PDF. HTMX: errors as HTML partial (200); success returns PDF bytes like a normal POST."""
     form = await request.form()

@@ -34,6 +34,7 @@ The app applies **`ProxyHeadersMiddleware`** so `X-Forwarded-Proto` / `X-Forward
 |----------|---------|
 | `TRUSTED_PROXY_IPS` | Comma-separated IPs or CIDRs of proxies that may set forwarded headers. Default `*` (trust any direct client—typical in a private Docker network). Tighten in production if the app is reachable without the proxy. |
 | `ROOT_PATH` | If the app is mounted under a URL prefix **without** the proxy stripping it (uncommon), set this to that prefix (e.g. `/math`) so OpenAPI and path helpers stay correct. Usually leave unset when Traefik strips the prefix before the request hits Uvicorn. |
+| `RATE_LIMIT_GENERATE` | Max PDF generations per client IP per window for `POST /generate` (slowapi / [limits](https://limits.readthedocs.io/en/stable/quickstart.html#rate-limit-string-notation) string, e.g. `30/minute`, `100/hour`). Default `30/minute`. Counts are in-process memory (each Uvicorn worker has its own counter unless you later configure shared storage). |
 
 No sticky sessions or Traefik-specific download routes are required: PDF bytes are returned directly from `POST /generate`.
 
