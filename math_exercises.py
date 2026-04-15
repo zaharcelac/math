@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime
 import io
 import math
@@ -31,7 +32,7 @@ PDF_SHEET_FOOTER_LINE_HEIGHT = 5
 PDF_FOOTER_ZONE_MM = (
     PDF_SHEET_FOOTER_FROM_BOTTOM + PDF_SHEET_FOOTER_LINE_HEIGHT + 3
 )
-# QR at end of footer line (same payload as ``footer_url``); only when a URL is shown
+# QR at end of footer line (same payload as resolved URL); only when QR is enabled (see env flags)
 PDF_FOOTER_QR_SIZE_MM = 12
 PDF_FOOTER_QR_GAP_MM = 10
 
@@ -129,6 +130,10 @@ def resolve_worksheet_footer_url(request_base: str | None = None) -> str | None:
     ``str(request.base_url)``), then :data:`DEFAULT_WORKSHEET_FOOTER_URL`. The code default
     must not run before ``request_base`` or the web UI would show a placeholder instead of
     the real origin.
+
+    Whether the URL appears in the footer text and whether a QR is drawn is controlled by
+    ``WORKSHEET_FOOTER_SHOW_URL`` and ``WORKSHEET_FOOTER_SHOW_QR`` (see
+    :func:`footer_render_options`).
     """
     for key in ("WORKSHEET_FOOTER_URL", "PUBLIC_BASE_URL"):
         raw = os.environ.get(key)
@@ -141,9 +146,37 @@ def resolve_worksheet_footer_url(request_base: str | None = None) -> str | None:
     return None
 
 
-def _pdf_footer_reserve_mm(footer_url: str | None) -> float:
+def _env_flag(name: str, *, default: bool = True) -> bool:
+    """True if env ``name`` is unset (use ``default``) or a truthy string (1/true/yes/on)."""
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
+@dataclass(frozen=True)
+class FooterRenderOptions:
+    """Resolved footer URL plus whether to show it in text and/or as a QR."""
+
+    url: str | None
+    show_url_text: bool
+    show_qr: bool
+
+
+def footer_render_options(resolved_url: str | None) -> FooterRenderOptions:
+    """Build footer rendering flags from env (defaults: show URL text and QR when a URL exists)."""
+    if not resolved_url:
+        return FooterRenderOptions(url=None, show_url_text=False, show_qr=False)
+    return FooterRenderOptions(
+        url=resolved_url,
+        show_url_text=_env_flag("WORKSHEET_FOOTER_SHOW_URL", default=True),
+        show_qr=_env_flag("WORKSHEET_FOOTER_SHOW_QR", default=True),
+    )
+
+
+def _pdf_footer_reserve_mm(footer: FooterRenderOptions) -> float:
     """Bottom margin for auto page-break: one footer line + optional QR on the same row."""
-    if footer_url:
+    if footer.url and footer.show_qr:
         return max(
             PDF_FOOTER_ZONE_MM,
             PDF_FOOTER_QR_SIZE_MM + PDF_FOOTER_QR_GAP_MM + PDF_SHEET_FOOTER_LINE_HEIGHT,
@@ -581,20 +614,23 @@ def _render_pdf_sheet_footer(
     test_count: int,
     max_number: int,
     tasks_per_type: int,
-    footer_url: str | None = None,
+    footer: FooterRenderOptions,
 ) -> None:
-    """Draw TEST line; with a URL, one row: text then QR (same payload as URL), no column split."""
+    """Draw TEST line; optional URL in text and/or QR (see :class:`FooterRenderOptions`)."""
     from fpdf.enums import XPos, YPos
 
     label = (
         f"TEST {test_index} OF {test_count}   "
         f"MAX-NUMBER {max_number}   TOTAL {tasks_per_type}"
     )
-    text = f"{label}   {footer_url}" if footer_url else label
-    margin = _pdf_footer_reserve_mm(footer_url)
+    url = footer.url
+    show_url = bool(url and footer.show_url_text)
+    show_qr = bool(url and footer.show_qr)
+    text = f"{label}   {url}" if show_url else label
+    margin = _pdf_footer_reserve_mm(footer)
     pdf.set_auto_page_break(auto=False)
     pdf.set_font("courier", size=FONT_SIZE_SHEET_FOOTER)
-    if footer_url:
+    if show_qr and url:
         qr_h = PDF_FOOTER_QR_SIZE_MM
         gap = PDF_FOOTER_QR_GAP_MM
         line_h = PDF_SHEET_FOOTER_LINE_HEIGHT
@@ -619,14 +655,14 @@ def _render_pdf_sheet_footer(
             new_y=YPos.TOP,
         )
         qr_x = pdf.get_x() + gap
-        qr_buf = _footer_qr_png(footer_url)
+        qr_buf = _footer_qr_png(url)
         pdf.image(
             qr_buf,
             x=qr_x,
             y=qr_y,
             w=qr_h,
             h=qr_h,
-            alt_text=f"QR {footer_url}",
+            alt_text=f"QR {url}",
         )
     else:
         pdf.set_y(-PDF_SHEET_FOOTER_FROM_BOTTOM)
@@ -648,7 +684,7 @@ def _render_pdf_worksheet_page(
     tasks_per_type: int,
     test_index: int,
     test_count: int,
-    footer_url: str | None = None,
+    footer: FooterRenderOptions,
 ) -> None:
     """Draw one worksheet: each exercise type on its own page; footer on every page."""
     from fpdf.enums import XPos, YPos
@@ -684,7 +720,7 @@ def _render_pdf_worksheet_page(
             pdf.cell(width, PDF_CELL_TASK_HEIGHT, line, align=cell_align)
 
         _render_pdf_sheet_footer(
-            pdf, test_index, test_count, max_number, tasks_per_type, footer_url
+            pdf, test_index, test_count, max_number, tasks_per_type, footer
         )
 
 
@@ -692,17 +728,17 @@ def _build_pdf_document(
     pages_sections: list[list[tuple[str, list[str]]]],
     max_number: int,
     tasks_per_type: int,
-    footer_url: str | None = None,
+    footer: FooterRenderOptions,
 ):
     """Build in-memory FPDF workbook (US Letter)."""
     from fpdf import FPDF
 
     pdf = FPDF(format="letter")
-    pdf.set_auto_page_break(auto=True, margin=_pdf_footer_reserve_mm(footer_url))
+    pdf.set_auto_page_break(auto=True, margin=_pdf_footer_reserve_mm(footer))
     test_count = len(pages_sections)
     for idx, sections in enumerate(pages_sections, start=1):
         _render_pdf_worksheet_page(
-            pdf, sections, max_number, tasks_per_type, idx, test_count, footer_url
+            pdf, sections, max_number, tasks_per_type, idx, test_count, footer
         )
     return pdf
 
@@ -711,10 +747,10 @@ def generate_pdf_bytes(
     pages_sections: list[list[tuple[str, list[str]]]],
     max_number: int,
     tasks_per_type: int,
-    footer_url: str | None = None,
+    footer: FooterRenderOptions,
 ) -> bytes:
     """Render workbook to PDF bytes (same layout as file output)."""
-    pdf = _build_pdf_document(pages_sections, max_number, tasks_per_type, footer_url)
+    pdf = _build_pdf_document(pages_sections, max_number, tasks_per_type, footer)
     raw = pdf.output(dest="S")
     return bytes(raw)
 
@@ -724,10 +760,10 @@ def generate_pdf(
     output_path: Path,
     max_number: int,
     tasks_per_type: int,
-    footer_url: str | None = None,
+    footer: FooterRenderOptions,
 ) -> None:
     """Write workbook PDF to disk."""
-    pdf = _build_pdf_document(pages_sections, max_number, tasks_per_type, footer_url)
+    pdf = _build_pdf_document(pages_sections, max_number, tasks_per_type, footer)
     pdf.output(str(output_path))
 
 
@@ -759,10 +795,13 @@ def generate_workbook_pdf_bytes(
 
     ``footer_url`` is passed to :func:`resolve_worksheet_footer_url` (e.g. ``str(request.base_url)``
     from the web app). For CLI, omit it and use env vars and/or :data:`DEFAULT_WORKSHEET_FOOTER_URL`.
+
+    Whether the URL appears in the footer line and whether a QR is drawn is set by
+    ``WORKSHEET_FOOTER_SHOW_URL`` and ``WORKSHEET_FOOTER_SHOW_QR`` (:func:`footer_render_options`).
     """
     pages = build_workbook_pages(exercise_types, total, max_number, sheets, seed)
     resolved = resolve_worksheet_footer_url(footer_url)
-    return generate_pdf_bytes(pages, max_number, total, footer_url=resolved)
+    return generate_pdf_bytes(pages, max_number, total, footer=footer_render_options(resolved))
 
 
 def parse_exercise_type_tokens(tokens: list[str]) -> list[str]:
@@ -927,7 +966,7 @@ def main() -> int:
                 pdf_path,
                 args.max_number,
                 args.total,
-                footer_url=resolve_worksheet_footer_url(),
+                footer=footer_render_options(resolve_worksheet_footer_url()),
             )
             print(f"\nPDF saved to: {pdf_path}", file=sys.stderr)
         except ImportError as e:

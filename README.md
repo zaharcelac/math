@@ -123,7 +123,12 @@ python3 math_exercises.py --types addition subtraction-missing-minuend --total 8
 - **Footer (every page):** centered line of the form  
 `TEST i OF n   MAX-NUMBER …   TOTAL …`  
 where `i`/`n` come from `--sheets`, and the last two fields mirror `--max-number` and `--total`.
-- **Footer URL (optional):** when resolved, the URL is appended on the **same** centered line as `TEST … MAX-NUMBER … TOTAL …`, and a **small QR code** is drawn under that line encoding the **same** URL string. Order of precedence: `WORKSHEET_FOOTER_URL`, `PUBLIC_BASE_URL`, the request’s `base_url` (web app), then `DEFAULT_WORKSHEET_FOOTER_URL` in `math_exercises.py`. Env overrides everything else.
+- **Footer URL (optional):** when resolved, the URL can be appended on the **same** line as `TEST … MAX-NUMBER … TOTAL …`, and a **small QR code** can be drawn at the end of that line encoding the **same** URL string. Order of precedence for the **URL value**: `WORKSHEET_FOOTER_URL`, `PUBLIC_BASE_URL`, the request’s `base_url` (web app), then `DEFAULT_WORKSHEET_FOOTER_URL` in `math_exercises.py`.
+
+| Variable | Purpose |
+|----------|---------|
+| `WORKSHEET_FOOTER_SHOW_URL` | If `0`/`false`/`no`, do not append the resolved URL to the footer text (default: show). |
+| `WORKSHEET_FOOTER_SHOW_QR` | If `0`/`false`/`no`, do not draw the QR code (default: show). You can show a QR without URL text, or URL text without a QR, by combining flags. |
 
 With `--print` and `--sheets` greater than 1, stdout shows only the **first** worksheet; the PDF contains all sheets.
 
