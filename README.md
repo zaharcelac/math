@@ -26,6 +26,23 @@ uvicorn web.app:app --reload --host 127.0.0.1 --port 8000
 
 Open [http://127.0.0.1:8000](http://127.0.0.1:8000) . With JavaScript enabled, validation errors update in place; on success the PDF is returned in the same response (no extra download URL or server-side session). Without JavaScript, submitting the form still returns the PDF as a normal file download.
 
+### Docker
+
+From the repository root:
+
+```bash
+docker build -t math-worksheets .
+docker run --rm -p 8000:8000 math-worksheets
+```
+
+Or:
+
+```bash
+docker compose up --build
+```
+
+The image runs **Uvicorn** as a non-root user, listens on **`0.0.0.0`** (port **`8000`** by default). Override bind address or port with **`HOST`** and **`WEB_PORT`** (the `CMD` passes them to Uvicorn). Map the container port when publishing, e.g. `-p 8080:8080` with `-e WEB_PORT=8080`. Use the same environment variables as in the **Behind a reverse proxy** section below (`TRUSTED_PROXY_IPS`, `RATE_LIMIT_GENERATE`, `WEB_EXPOSE_DOCS`, `WEB_HSTS_MAX_AGE`, etc.).
+
 ### Behind a reverse proxy (e.g. Traefik)
 
 The app applies `**ProxyHeadersMiddleware**` so `X-Forwarded-Proto` / `X-Forwarded-For` from the proxy are honored without extra Uvicorn flags. You can tune trust with environment variables:
@@ -121,10 +138,12 @@ Within each worksheet (one run of `build_sections`):
 ## Files
 
 
-| File                | Role                                                      |
-| ------------------- | --------------------------------------------------------- |
-| `math_exercises.py` | CLI and generator                                         |
-| `requirements.txt`  | `fpdf2` and `qrcode[pil]` for `--print` (PDF + footer QR) |
+| File                 | Role                                                      |
+| -------------------- | --------------------------------------------------------- |
+| `math_exercises.py`  | CLI and generator                                         |
+| `requirements.txt`   | `fpdf2` and `qrcode[pil]` for `--print` (PDF + footer QR) |
+| `Dockerfile`         | Container image for the web app (Uvicorn + FastAPI)       |
+| `docker-compose.yml` | Example `docker compose` service on port 8000               |
 
 
 ## License
