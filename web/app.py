@@ -65,6 +65,21 @@ def _trusted_proxy_hosts() -> str | list[str]:
 
 _root_path = os.environ.get("ROOT_PATH", "").strip()
 
+
+def _template_paths() -> dict[str, str]:
+    """Paths for HTML forms and HTMX (must match FastAPI ``root_path`` / ``ROOT_PATH`` env)."""
+    p = (_root_path or "").strip()
+    if not p or p == "/":
+        prefix = ""
+    else:
+        prefix = p if p.startswith("/") else f"/{p}"
+        prefix = prefix.rstrip("/")
+    return {
+        "url_prefix": prefix,
+        "path_generate": f"{prefix}/generate" if prefix else "/generate",
+    }
+
+
 # OpenAPI UI: disable in production (set WEB_EXPOSE_DOCS=0).
 _expose_docs_raw = os.environ.get("WEB_EXPOSE_DOCS", "1").strip().lower()
 EXPOSE_OPENAPI_DOCS = _expose_docs_raw in ("1", "true", "yes")
@@ -170,6 +185,7 @@ async def index(request: Request) -> Response:
         request,
         "index.html",
         {
+            **_template_paths(),
             "types_order": EXERCISE_TYPES_ORDER,
             "type_titles": EXERCISE_TITLES,
             "errors": None,
@@ -228,6 +244,7 @@ async def generate(request: Request) -> Response:
 
     if errors:
         ctx = {
+            **_template_paths(),
             "types_order": EXERCISE_TYPES_ORDER,
             "type_titles": EXERCISE_TITLES,
             "errors": errors,
@@ -256,6 +273,7 @@ async def generate(request: Request) -> Response:
         )
     except RuntimeError as e:
         ctx = {
+            **_template_paths(),
             "types_order": EXERCISE_TYPES_ORDER,
             "type_titles": EXERCISE_TITLES,
             "errors": [str(e)],
