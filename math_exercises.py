@@ -248,14 +248,14 @@ def _footer_qr_png(url: str) -> io.BytesIO:
     return buf
 
 
-def digit_slots(max_number: int) -> int:
-    """Character width for every number and blank: same as digit count of --max-number."""
-    return max(1, len(str(max_number)))
+def digit_slots(max_value: int) -> int:
+    """Character width for every number and blank: same as digit count of --max-value."""
+    return max(1, len(str(max_value)))
 
 
-def align_equation_line(task: str, max_number: int) -> str:
+def align_equation_line(task: str, max_value: int) -> str:
     """Fixed columns: each operand/result/blank is digit_slots wide; numbers right-aligned."""
-    col_w = digit_slots(max_number)
+    col_w = digit_slots(max_value)
     blank_fill = "_" * col_w
     parts = task.split()
 
@@ -314,9 +314,9 @@ def equation_includes_zero_value(task: str) -> bool:
 
 
 def generate_addition_tasks(
-    total: int, max_number: int, blank_w: int, shared_seen: set[str]
+    total: int, max_value: int, blank_w: int, shared_seen: set[str]
 ) -> list[str]:
-    """Generate addition tasks: a + b = blanks where a, b, and a+b <= max_number."""
+    """Generate addition tasks: a + b = blanks where a, b, and a+b <= max_value."""
     bl = "_" * blank_w
     max_zero = max_equations_with_zero(total)
     tasks: list[str] = []
@@ -326,9 +326,9 @@ def generate_addition_tasks(
 
     while len(tasks) < total and attempts < max_attempts:
         attempts += 1
-        a = random.randint(0, max_number)
-        b = random.randint(0, max_number)
-        if a + b > max_number:
+        a = random.randint(0, max_value)
+        b = random.randint(0, max_value)
+        if a + b > max_value:
             continue
         s = f"{a} + {b} = {bl}"
         if s in shared_seen:
@@ -344,16 +344,16 @@ def generate_addition_tasks(
     if len(tasks) < total:
         raise RuntimeError(
             f"Could not generate {total} unique addition tasks with at most {max_zero} "
-            f"containing 0 (max_number={max_number}). "
-            "Increase --max-number or reduce --total."
+            f"containing 0 (max_value={max_value}). "
+            "Increase --max-value or reduce --total."
         )
     return tasks
 
 
 def generate_subtraction_tasks(
-    total: int, max_number: int, blank_w: int, shared_seen: set[str]
+    total: int, max_value: int, blank_w: int, shared_seen: set[str]
 ) -> list[str]:
-    """Generate subtraction tasks: a - b = blanks where a, b, and a-b <= max_number."""
+    """Generate subtraction tasks: a - b = blanks where a, b, and a-b <= max_value."""
     bl = "_" * blank_w
     max_zero = max_equations_with_zero(total)
     tasks: list[str] = []
@@ -363,11 +363,11 @@ def generate_subtraction_tasks(
 
     while len(tasks) < total and attempts < max_attempts:
         attempts += 1
-        a = random.randint(0, max_number)
-        b = random.randint(0, max_number)
+        a = random.randint(0, max_value)
+        b = random.randint(0, max_value)
         if a < b:
             a, b = b, a
-        if a - b > max_number:
+        if a - b > max_value:
             continue
         s = f"{a} - {b} = {bl}"
         if s in shared_seen:
@@ -383,14 +383,14 @@ def generate_subtraction_tasks(
     if len(tasks) < total:
         raise RuntimeError(
             f"Could not generate {total} unique subtraction tasks with at most {max_zero} "
-            f"containing 0 (max_number={max_number}). "
-            "Increase --max-number or reduce --total."
+            f"containing 0 (max_value={max_value}). "
+            "Increase --max-value or reduce --total."
         )
     return tasks
 
 
 def generate_addition_missing_first_addend_tasks(
-    total: int, max_number: int, blank_w: int, shared_seen: set[str]
+    total: int, max_value: int, blank_w: int, shared_seen: set[str]
 ) -> list[str]:
     """Generate __ + b = c (first addend missing)."""
     bl = "_" * blank_w
@@ -400,8 +400,8 @@ def generate_addition_missing_first_addend_tasks(
     attempts = 0
     while len(tasks) < total and attempts < total * 400:
         attempts += 1
-        b = random.randint(0, max_number)
-        c = random.randint(b, max_number)
+        b = random.randint(0, max_value)
+        c = random.randint(b, max_value)
         s = f"{bl} + {b} = {c}"
         if s in shared_seen:
             continue
@@ -416,15 +416,15 @@ def generate_addition_missing_first_addend_tasks(
     if len(tasks) < total:
         raise RuntimeError(
             f"Could not generate {total} unique first-missing-addend tasks with at most {max_zero} "
-            f"containing 0 (max_number={max_number}). "
-            "Increase --max-number or reduce --total."
+            f"containing 0 (max_value={max_value}). "
+            "Increase --max-value or reduce --total."
         )
     random.shuffle(tasks)
     return tasks
 
 
 def generate_addition_missing_second_addend_tasks(
-    total: int, max_number: int, blank_w: int, shared_seen: set[str]
+    total: int, max_value: int, blank_w: int, shared_seen: set[str]
 ) -> list[str]:
     """Generate a + __ = c (second addend missing)."""
     bl = "_" * blank_w
@@ -434,8 +434,8 @@ def generate_addition_missing_second_addend_tasks(
     attempts = 0
     while len(tasks) < total and attempts < total * 400:
         attempts += 1
-        a = random.randint(0, max_number)
-        c = random.randint(a, max_number)
+        a = random.randint(0, max_value)
+        c = random.randint(a, max_value)
         s = f"{a} + {bl} = {c}"
         if s in shared_seen:
             continue
@@ -450,15 +450,15 @@ def generate_addition_missing_second_addend_tasks(
     if len(tasks) < total:
         raise RuntimeError(
             f"Could not generate {total} unique second-missing-addend tasks with at most {max_zero} "
-            f"containing 0 (max_number={max_number}). "
-            "Increase --max-number or reduce --total."
+            f"containing 0 (max_value={max_value}). "
+            "Increase --max-value or reduce --total."
         )
     random.shuffle(tasks)
     return tasks
 
 
 def generate_subtraction_missing_minuend_tasks(
-    total: int, max_number: int, blank_w: int, shared_seen: set[str]
+    total: int, max_value: int, blank_w: int, shared_seen: set[str]
 ) -> list[str]:
     """Generate __ - b = c (minuend missing)."""
     bl = "_" * blank_w
@@ -468,9 +468,9 @@ def generate_subtraction_missing_minuend_tasks(
     attempts = 0
     while len(tasks) < total and attempts < total * 400:
         attempts += 1
-        b = random.randint(0, max_number)
-        c = random.randint(0, max_number)
-        if b + c > max_number:
+        b = random.randint(0, max_value)
+        c = random.randint(0, max_value)
+        if b + c > max_value:
             continue
         s = f"{bl} - {b} = {c}"
         if s in shared_seen:
@@ -486,15 +486,15 @@ def generate_subtraction_missing_minuend_tasks(
     if len(tasks) < total:
         raise RuntimeError(
             f"Could not generate {total} unique missing-minuend tasks with at most {max_zero} "
-            f"containing 0 (max_number={max_number}). "
-            "Increase --max-number or reduce --total."
+            f"containing 0 (max_value={max_value}). "
+            "Increase --max-value or reduce --total."
         )
     random.shuffle(tasks)
     return tasks
 
 
 def generate_subtraction_missing_subtrahend_tasks(
-    total: int, max_number: int, blank_w: int, shared_seen: set[str]
+    total: int, max_value: int, blank_w: int, shared_seen: set[str]
 ) -> list[str]:
     """Generate a - __ = c (subtrahend missing)."""
     bl = "_" * blank_w
@@ -504,9 +504,9 @@ def generate_subtraction_missing_subtrahend_tasks(
     attempts = 0
     while len(tasks) < total and attempts < total * 400:
         attempts += 1
-        a = random.randint(0, max_number)
+        a = random.randint(0, max_value)
         c = random.randint(0, a)
-        if a - c > max_number:
+        if a - c > max_value:
             continue
         s = f"{a} - {bl} = {c}"
         if s in shared_seen:
@@ -522,17 +522,17 @@ def generate_subtraction_missing_subtrahend_tasks(
     if len(tasks) < total:
         raise RuntimeError(
             f"Could not generate {total} unique missing-subtrahend tasks with at most {max_zero} "
-            f"containing 0 (max_number={max_number}). "
-            "Increase --max-number or reduce --total."
+            f"containing 0 (max_value={max_value}). "
+            "Increase --max-value or reduce --total."
         )
     random.shuffle(tasks)
     return tasks
 
 
 def generate_addition_balance_tasks(
-    total: int, max_number: int, blank_w: int, shared_seen: set[str]
+    total: int, max_value: int, blank_w: int, shared_seen: set[str]
 ) -> list[str]:
-    """Generate X + Y = W + _ with X+Y = W+answer and all of X,Y,W,answer ≤ max_number (and X+Y ≤ max_number).
+    """Generate X + Y = W + _ with X+Y = W+answer and all of X,Y,W,answer ≤ max_value (and X+Y ≤ max_value).
     W is never equal to X or Y."""
     bl = "_" * blank_w
     max_zero = max_equations_with_zero(total)
@@ -543,13 +543,13 @@ def generate_addition_balance_tasks(
 
     while len(tasks) < total and attempts < max_attempts:
         attempts += 1
-        x = random.randint(0, max_number)
-        y = random.randint(0, max_number)
+        x = random.randint(0, max_value)
+        y = random.randint(0, max_value)
         s = x + y
-        if s > max_number:
+        if s > max_value:
             continue
-        w_lo = max(0, s - max_number)
-        w_hi = min(s, max_number)
+        w_lo = max(0, s - max_value)
+        w_hi = min(s, max_value)
         choices = [w for w in range(w_lo, w_hi + 1) if w not in (x, y)]
         if not choices:
             continue
@@ -568,17 +568,17 @@ def generate_addition_balance_tasks(
     if len(tasks) < total:
         raise RuntimeError(
             f"Could not generate {total} unique addition-balance tasks with at most {max_zero} "
-            f"containing 0 (max_number={max_number}). "
-            "Increase --max-number or reduce --total."
+            f"containing 0 (max_value={max_value}). "
+            "Increase --max-value or reduce --total."
         )
     random.shuffle(tasks)
     return tasks
 
 
 def generate_subtraction_balance_tasks(
-    total: int, max_number: int, blank_w: int, shared_seen: set[str]
+    total: int, max_value: int, blank_w: int, shared_seen: set[str]
 ) -> list[str]:
-    """Generate X - Y = W - _ with X-Y = W-answer, X≥Y, all operands/answers ≤ max_number.
+    """Generate X - Y = W - _ with X-Y = W-answer, X≥Y, all operands/answers ≤ max_value.
     W is never equal to X or Y."""
     bl = "_" * blank_w
     max_zero = max_equations_with_zero(total)
@@ -589,16 +589,16 @@ def generate_subtraction_balance_tasks(
 
     while len(tasks) < total and attempts < max_attempts:
         attempts += 1
-        x = random.randint(0, max_number)
-        y = random.randint(0, max_number)
+        x = random.randint(0, max_value)
+        y = random.randint(0, max_value)
         if x < y:
             x, y = y, x
         s = x - y
-        if s > max_number:
+        if s > max_value:
             continue
-        # W - ? = S  =>  ? = W - S; need W ≥ S and ? ≤ max_number (automatic when W ≤ max_number)
+        # W - ? = S  =>  ? = W - S; need W ≥ S and ? ≤ max_value (automatic when W ≤ max_value)
         w_lo = s
-        w_hi = max_number
+        w_hi = max_value
         choices = [w for w in range(w_lo, w_hi + 1) if w not in (x, y)]
         if not choices:
             continue
@@ -617,20 +617,20 @@ def generate_subtraction_balance_tasks(
     if len(tasks) < total:
         raise RuntimeError(
             f"Could not generate {total} unique subtraction-balance tasks with at most {max_zero} "
-            f"containing 0 (max_number={max_number}). "
-            "Increase --max-number or reduce --total."
+            f"containing 0 (max_value={max_value}). "
+            "Increase --max-value or reduce --total."
         )
     random.shuffle(tasks)
     return tasks
 
 
-def format_output(sections: list[tuple[str, list[str]]], max_number: int) -> str:
+def format_output(sections: list[tuple[str, list[str]]], max_value: int) -> str:
     """Format exercises for text output: (section title, tasks)."""
     lines: list[str] = []
     for title, tasks in sections:
         if lines:
             lines.append("")
-        aligned = [align_equation_line(t, max_number) for t in tasks]
+        aligned = [align_equation_line(t, max_value) for t in tasks]
         lines.extend([title, "-" * 40, *aligned])
     return "\n".join(lines)
 
@@ -639,7 +639,7 @@ def _render_pdf_sheet_footer(
     pdf: object,
     test_index: int,
     test_count: int,
-    max_number: int,
+    max_value: int,
     tasks_per_type: int,
     footer: FooterRenderOptions,
 ) -> None:
@@ -647,8 +647,8 @@ def _render_pdf_sheet_footer(
     from fpdf.enums import XPos, YPos
 
     label = (
-        f"TEST {test_index} OF {test_count}   "
-        f"MAX-NUMBER {max_number}   TOTAL {tasks_per_type}"
+        f"SET {test_index} OF {test_count}   "
+        f"MAX-VALUE {max_value}   TOTAL {tasks_per_type}"
     )
     url = footer.url
     show_url = bool(url and footer.show_url_text)
@@ -708,7 +708,7 @@ def _render_pdf_sheet_footer(
 def _render_pdf_worksheet_page(
     pdf: object,
     sections: list[tuple[str, list[str]]],
-    max_number: int,
+    max_value: int,
     tasks_per_type: int,
     test_index: int,
     test_count: int,
@@ -742,19 +742,19 @@ def _render_pdf_worksheet_page(
             if i > 0 and i % cols == 0:
                 pdf.ln(PDF_GAP_TASK_ROW)
             width = 190 / cols
-            line = align_equation_line(task, max_number)
+            line = align_equation_line(task, max_value)
             col_idx = i % cols
             cell_align = "R" if col_idx == cols - 1 else "L"
             pdf.cell(width, PDF_CELL_TASK_HEIGHT, line, align=cell_align)
 
         _render_pdf_sheet_footer(
-            pdf, test_index, test_count, max_number, tasks_per_type, footer
+            pdf, test_index, test_count, max_value, tasks_per_type, footer
         )
 
 
 def _build_pdf_document(
     pages_sections: list[list[tuple[str, list[str]]]],
-    max_number: int,
+    max_value: int,
     tasks_per_type: int,
     footer: FooterRenderOptions,
 ):
@@ -766,19 +766,19 @@ def _build_pdf_document(
     test_count = len(pages_sections)
     for idx, sections in enumerate(pages_sections, start=1):
         _render_pdf_worksheet_page(
-            pdf, sections, max_number, tasks_per_type, idx, test_count, footer
+            pdf, sections, max_value, tasks_per_type, idx, test_count, footer
         )
     return pdf
 
 
 def generate_pdf_bytes(
     pages_sections: list[list[tuple[str, list[str]]]],
-    max_number: int,
+    max_value: int,
     tasks_per_type: int,
     footer: FooterRenderOptions,
 ) -> bytes:
     """Render workbook to PDF bytes (same layout as file output)."""
-    pdf = _build_pdf_document(pages_sections, max_number, tasks_per_type, footer)
+    pdf = _build_pdf_document(pages_sections, max_value, tasks_per_type, footer)
     raw = pdf.output(dest="S")
     return bytes(raw)
 
@@ -786,19 +786,19 @@ def generate_pdf_bytes(
 def generate_pdf(
     pages_sections: list[list[tuple[str, list[str]]]],
     output_path: Path,
-    max_number: int,
+    max_value: int,
     tasks_per_type: int,
     footer: FooterRenderOptions,
 ) -> None:
     """Write workbook PDF to disk."""
-    pdf = _build_pdf_document(pages_sections, max_number, tasks_per_type, footer)
+    pdf = _build_pdf_document(pages_sections, max_value, tasks_per_type, footer)
     pdf.output(str(output_path))
 
 
 def build_workbook_pages(
     exercise_types: list[str],
     total: int,
-    max_number: int,
+    max_value: int,
     sheets: int,
     seed: int | None,
 ) -> list[list[tuple[str, list[str]]]]:
@@ -807,14 +807,14 @@ def build_workbook_pages(
     for i in range(sheets):
         if seed is not None:
             random.seed(seed + i)
-        pages.append(build_sections(exercise_types, total, max_number))
+        pages.append(build_sections(exercise_types, total, max_value))
     return pages
 
 
 def generate_workbook_pdf_bytes(
     exercise_types: list[str],
     total: int,
-    max_number: int,
+    max_value: int,
     sheets: int,
     seed: int | None,
     footer_url: str | None = None,
@@ -827,9 +827,9 @@ def generate_workbook_pdf_bytes(
     Whether the URL appears in the footer line and whether a QR is drawn is set by
     ``WORKSHEET_FOOTER_SHOW_URL`` and ``WORKSHEET_FOOTER_SHOW_QR`` (:func:`footer_render_options`).
     """
-    pages = build_workbook_pages(exercise_types, total, max_number, sheets, seed)
+    pages = build_workbook_pages(exercise_types, total, max_value, sheets, seed)
     resolved = resolve_worksheet_footer_url(footer_url)
-    return generate_pdf_bytes(pages, max_number, total, footer=footer_render_options(resolved))
+    return generate_pdf_bytes(pages, max_value, total, footer=footer_render_options(resolved))
 
 
 def parse_exercise_type_tokens(tokens: list[str]) -> list[str]:
@@ -855,10 +855,10 @@ def parse_exercise_type_tokens(tokens: list[str]) -> list[str]:
 
 
 def build_sections(
-    types: list[str], total: int, max_number: int
+    types: list[str], total: int, max_value: int
 ) -> list[tuple[str, list[str]]]:
     """Generate tasks for each type in order; titles from EXERCISE_TITLES."""
-    bw = digit_slots(max_number)
+    bw = digit_slots(max_value)
     shared_seen: set[str] = set()
     generators: dict[str, Callable[[int, int, int, set[str]], list[str]]] = {
         TYPE_ADDITION: generate_addition_tasks,
@@ -872,7 +872,7 @@ def build_sections(
     }
     sections: list[tuple[str, list[str]]] = []
     for key in types:
-        tasks = generators[key](total, max_number, bw, shared_seen)
+        tasks = generators[key](total, max_value, bw, shared_seen)
         sections.append((EXERCISE_TITLES[key], tasks))
     return sections
 
@@ -888,11 +888,11 @@ def main() -> int:
         help="Number of tasks per type (default: 12)",
     )
     parser.add_argument(
-        "--max-number",
+        "--max-value",
         type=int,
         default=20,
         metavar="N",
-        help="Maximum number used in equations (default: 20)",
+        help="Maximum value used in equations (default: 20)",
     )
     parser.add_argument(
         "--print",
@@ -961,8 +961,8 @@ def main() -> int:
     if args.total < 1:
         print("Error: --total must be at least 1", file=sys.stderr)
         return 1
-    if args.max_number < 0:
-        print("Error: --max-number must be non-negative", file=sys.stderr)
+    if args.max_value < 0:
+        print("Error: --max-value must be non-negative", file=sys.stderr)
         return 1
     if args.sheets < 1:
         print("Error: --sheets must be at least 1", file=sys.stderr)
@@ -975,12 +975,12 @@ def main() -> int:
                 if args.seed is not None:
                     random.seed(args.seed + i)
                 pages.append(
-                    build_sections(exercise_types, args.total, args.max_number)
+                    build_sections(exercise_types, args.total, args.max_value)
                 )
         except RuntimeError as e:
             print(f"Error: {e}", file=sys.stderr)
             return 1
-        print(format_output(pages[0], args.max_number))
+        print(format_output(pages[0], args.max_value))
         if args.sheets > 1:
             print(
                 f"(Text above is TEST 1 OF {args.sheets}; PDF has {args.sheets} worksheets, each labeled TEST i OF {args.sheets}.)",
@@ -992,7 +992,7 @@ def main() -> int:
             generate_pdf(
                 pages,
                 pdf_path,
-                args.max_number,
+                args.max_value,
                 args.total,
                 footer=footer_render_options(resolve_worksheet_footer_url()),
             )
@@ -1007,11 +1007,11 @@ def main() -> int:
         if args.seed is not None:
             random.seed(args.seed)
         try:
-            sections = build_sections(exercise_types, args.total, args.max_number)
+            sections = build_sections(exercise_types, args.total, args.max_value)
         except RuntimeError as e:
             print(f"Error: {e}", file=sys.stderr)
             return 1
-        print(format_output(sections, args.max_number))
+        print(format_output(sections, args.max_value))
         if args.sheets > 1:
             print(
                 "Note: --sheets applies only with --print; ignored here.",

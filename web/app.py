@@ -43,7 +43,7 @@ templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 # Reasonable limits for a public form
 MAX_TOTAL = 60
-MAX_MAX_NUMBER = 200
+MAX_MAX_VALUE = 200
 MAX_SHEETS = 20
 
 # PDF generation is CPU-heavy; default caps requests per client IP (see slowapi / limits syntax).
@@ -193,7 +193,7 @@ async def index(request: Request) -> Response:
             "errors": None,
             "values": {
                 "total": 20,
-                "max_number": 15,
+                "max_value": 15,
                 "sheets": 1,
                 "seed": "",
             },
@@ -209,10 +209,10 @@ async def generate(request: Request) -> Response:
     form = await request.form()
     try:
         total = int(form.get("total", 12))
-        max_number = int(form.get("max_number", 15))
+        max_value = int(form.get("max_value", 15))
         sheets = int(form.get("sheets", 1))
     except (TypeError, ValueError):
-        total, max_number, sheets = 12, 15, 1
+        total, max_value, sheets = 12, 15, 1
     seed = str(form.get("seed") or "")
     types = form.getlist("types")
 
@@ -221,8 +221,8 @@ async def generate(request: Request) -> Response:
 
     if total < 1 or total > MAX_TOTAL:
         errors.append(f"Total must be between 1 and {MAX_TOTAL}.")
-    if max_number < 0 or max_number > MAX_MAX_NUMBER:
-        errors.append(f"Max number must be between 0 and {MAX_MAX_NUMBER}.")
+    if max_value < 0 or max_value > MAX_MAX_VALUE:
+        errors.append(f"Max value must be between 0 and {MAX_MAX_VALUE}.")
     if sheets < 1 or sheets > MAX_SHEETS:
         errors.append(f"Sheets must be between 1 and {MAX_SHEETS}.")
 
@@ -253,7 +253,7 @@ async def generate(request: Request) -> Response:
             "errors": errors,
             "values": {
                 "total": total,
-                "max_number": max_number,
+                "max_value": max_value,
                 "sheets": sheets,
                 "seed": seed,
             },
@@ -269,7 +269,7 @@ async def generate(request: Request) -> Response:
         pdf_bytes = generate_workbook_pdf_bytes(
             exercise_types,
             total,
-            max_number,
+            max_value,
             sheets,
             seed_val,
             footer_url=str(request.base_url),
@@ -283,7 +283,7 @@ async def generate(request: Request) -> Response:
             "errors": [str(e)],
             "values": {
                 "total": total,
-                "max_number": max_number,
+                "max_value": max_value,
                 "sheets": sheets,
                 "seed": seed,
             },
