@@ -12,17 +12,44 @@
       color: #1a1a1a;
       background: #f6f7f9;
     }
-    body { margin: 0 auto; max-width: 40rem; padding: 1.5rem; }
+    body { margin: 0 auto; max-width: 48rem; padding: 1.5rem; }
     h1 { font-size: 1.35rem; margin-top: 0; }
     fieldset { border: 1px solid #ccc; border-radius: 6px; padding: 0.75rem 1rem; margin: 0 0 1rem; background: #fff; }
     legend { padding: 0 0.35rem; font-weight: 600; }
     label { display: block; margin: 0.35rem 0; }
-    .row { display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; align-items: baseline; margin: 0.5rem 0; }
+    .row { display: flex; flex-direction: column; flex-wrap: nowrap; gap: 0.75rem; align-items: stretch; margin: 0.5rem 0; }
     .row label { margin: 0; }
     input[type="number"], input[type="text"] { width: 6rem; padding: 0.35rem 0.5rem; }
     input[type="text"]#seed { width: 10rem; }
     .types-grid { display: grid; gap: 0.35rem; }
-    .types-grid label { font-weight: normal; }
+    label.type-option {
+      display: flex;
+      align-items: baseline;
+      gap: 0.45rem;
+      font-weight: normal;
+    }
+    .type-option-body {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 0.35rem 1rem;
+    }
+    .type-option-segment {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 0.35rem;
+    }
+    .type-option-kicker {
+      font-weight: 600;
+      font-size: 0.85rem;
+      color: #334155;
+    }
+    .type-option-title { font-weight: 600; }
+    .type-option-example {
+      font-family: ui-monospace, "Cascadia Code", "Source Code Pro", monospace;
+      font-size: 0.85rem;
+      color: #555;
+    }
     button { padding: 0.5rem 1rem; font-size: 1rem; cursor: pointer; border-radius: 6px; border: 1px solid #2563eb; background: #2563eb; color: #fff; }
     button:hover { background: #1d4ed8; border-color: #1d4ed8; }
     .types-toolbar { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem; }
@@ -31,15 +58,51 @@
     .hint { font-size: 0.85rem; color: #555; margin: 0.25rem 0 0; }
     .errors { background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 0.5rem 1rem; margin-bottom: 1rem; }
     .errors ul { margin: 0; padding-left: 1.25rem; }
-    .site-links { font-size: 0.9rem; margin: -0.2rem 0 0.75rem; }
+    .form-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem 1rem;
+      margin: 0.5rem 0 1rem;
+    }
+    .form-actions > .site-links { margin: 0; }
+    .site-links { font-size: 0.9rem; }
     .site-links a { color: #2563eb; display: inline-flex; align-items: center; gap: 0.35rem; }
-    .site-links a .github-icon { flex-shrink: 0; width: 1em; height: 1em; }
+    .site-links a .github-icon { flex-shrink: 0; width: 1em; height: 2em; }
+    label.field-hint {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 0.35rem 0.75rem;
+    }
+    .field-hint .field-label {
+      flex: 0 0 auto;
+      min-width: 9.5rem;
+      font-weight: 600;
+    }
+    .field-hint-with-input {
+      display: inline-flex;
+      flex: 1 1 12rem;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: 0.5rem 0.75rem;
+    }
+    .field-hint-text {
+      font-size: 0.85rem;
+      font-weight: normal;
+      color: #555;
+      line-height: 1.4;
+      flex: 1 1 16rem;
+      max-width: 36rem;
+    }
   </style>
 </head>
 <body>
   <h1>Grade 1 math worksheets</h1>
-  <p class="site-links"><a href="https://github.com/zaharcelac/math" rel="noopener noreferrer" target="_blank"><svg class="github-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>GitHub project</a></p>
-  <p class="hint">Choose options and generate a printable PDF. With JavaScript on, validation messages appear without leaving the page; a successful run downloads the file in the same request.</p>
+  
+ 
 
   <div id="errors">
     {% include "partials/errors.html" %}
@@ -54,14 +117,38 @@
     hx-swap="innerHTML"
   >
     <fieldset>
-      <legend>Layout</legend>
+      <legend>Page layout</legend>
       <div class="row">
-        <label>Problems per type <input type="number" name="total" min="1" max="60" value="{{ values.total }}" required /></label>
-        <label>Max number <input type="number" name="max_number" min="0" max="200" value="{{ values.max_number }}" required /></label>
-        <label>Sheets <input type="number" name="sheets" min="1" max="20" value="{{ values.sheets }}" required /></label>
+        <label class="field-hint">
+          <span class="field-label">Problems per exercise type</span>
+          <span class="field-hint-with-input">
+            <input type="number" name="total" min="1" max="60" value="{{ values.total }}" required aria-describedby="hint-total" />
+            <span class="field-hint-text" id="hint-total">Number of problems (equations) for each exercise type. Usually one US Letter page fits 20 problems.</span>
+          </span>
+        </label>
+        <label class="field-hint">
+          <span class="field-label">Max value in problem</span>
+          <span class="field-hint-with-input">
+            <input type="number" name="max_number" min="0" max="200" value="{{ values.max_number }}" required aria-describedby="hint-max-number" />
+            <span class="field-hint-text" id="hint-max-number">Complexity of equations. Set the max value of operand on any side of the problem.</span>
+          </span>
+        </label>
+        <label class="field-hint">
+          <span class="field-label">Number of sets</span>
+          <span class="field-hint-with-input">
+            <input type="number" name="sheets" min="1" max="20" value="{{ values.sheets }}" required aria-describedby="hint-sheets" />
+            <span class="field-hint-text" id="hint-sheets">Number of sets to generate. Each set will have a separate combination of selected exercise types.</span>
+          </span>
+        </label>
+        <label class="field-hint">
+          <span class="field-label">Seed</span>
+          <span class="field-hint-with-input">
+            <input type="text" name="seed" id="seed" value="{{ values.seed }}" placeholder="optional integer" autocomplete="off" aria-describedby="hint-seed" />
+            <span class="field-hint-text" id="hint-seed">Same seed + options yields the same worksheet sequence.</span>
+          </span>
+        </label>
       </div>
-      <label>Seed <input type="text" name="seed" id="seed" value="{{ values.seed }}" placeholder="optional integer" autocomplete="off" /></label>
-      <p class="hint">Same seed + options yields the same worksheet sequence.</p>
+
     </fieldset>
 
     <fieldset>
@@ -72,15 +159,27 @@
       </div>
       <div class="types-grid">
         {% for t in types_order %}
-        <label>
+        <label class="type-option">
           <input type="checkbox" name="types" value="{{ t }}" {% if t in selected_types %}checked{% endif %} />
-          {{ type_titles[t] }}
+          <span class="type-option-body">
+            <span class="type-option-segment">
+              
+              <span class="type-option-title">{{ type_titles[t] }}</span>
+            </span>
+            <span class="type-option-segment">
+              <strong class="type-option-kicker">Example:</strong>
+              <span class="type-option-example">{{ type_examples[t] }}</span>
+            </span>
+          </span>
         </label>
         {% endfor %}
       </div>
     </fieldset>
 
-    <button type="submit">Generate PDF</button>
+    <div class="form-actions">
+      <button type="submit">Generate PDF</button>
+      <p class="site-links"><a href="https://github.com/zaharcelac/math" rel="noopener noreferrer" target="_blank"><svg class="github-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>GitHub project</a></p>
+    </div>
   </form>
   <script>
     (function () {

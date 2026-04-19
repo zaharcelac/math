@@ -84,6 +84,18 @@ EXERCISE_TITLES: dict[str, str] = {
     TYPE_SUBTRACTION_BALANCE: "SUBTRACTION (BALANCE)",
 }
 
+# Short illustrative lines for the web UI (blanks match worksheet underscore style).
+EXERCISE_TYPE_EXAMPLES: dict[str, str] = {
+    TYPE_ADDITION: "3 + 4 = ___",
+    TYPE_SUBTRACTION: "7 - 2 = ___",
+    TYPE_ADDITION_MISSING_FIRST: "___ + 5 = 8",
+    TYPE_ADDITION_MISSING_SECOND: "3 + ___ = 9",
+    TYPE_SUBTRACTION_MISSING_MINUEND: "___ - 4 = 3",
+    TYPE_SUBTRACTION_MISSING_SUBTRAHEND: "9 - ___ = 4",
+    TYPE_ADDITION_BALANCE: "2 + 3 = 1 + ___",
+    TYPE_SUBTRACTION_BALANCE: "7 - 2 = 8 - ___",
+}
+
 # CLI --types: full names or abbreviations (case-insensitive)
 EXERCISE_TYPE_ALIASES: dict[str, str] = {
     TYPE_ADDITION: TYPE_ADDITION,
@@ -184,6 +196,21 @@ def _pdf_footer_reserve_mm(footer: FooterRenderOptions) -> float:
     return PDF_FOOTER_ZONE_MM
 
 
+def _footer_url_for_display(url: str) -> str:
+    """Return ``url`` without a leading ``http://`` or ``https://`` (any letter case).
+
+    The PDF footer line uses this for a shorter printed string; the QR still encodes the
+    full resolved URL.
+    """
+    u = url.strip()
+    lower = u.lower()
+    if lower.startswith("https://"):
+        return u[8:]
+    if lower.startswith("http://"):
+        return u[7:]
+    return u
+
+
 def _truncate_text_to_width(pdf: object, text: str, max_w: float) -> str:
     """Shorten ``text`` so ``get_string_width`` fits ``max_w`` (ellipsis if needed)."""
     if pdf.get_string_width(text) <= max_w:
@@ -203,7 +230,7 @@ def _truncate_text_to_width(pdf: object, text: str, max_w: float) -> str:
 
 
 def _footer_qr_png(url: str) -> io.BytesIO:
-    """PNG bytes for a small QR code encoding ``url`` (same string as footer text)."""
+    """PNG bytes for a small QR code encoding the full ``url`` (footer text may omit the scheme)."""
     import qrcode
 
     buf = io.BytesIO()
@@ -626,7 +653,8 @@ def _render_pdf_sheet_footer(
     url = footer.url
     show_url = bool(url and footer.show_url_text)
     show_qr = bool(url and footer.show_qr)
-    text = f"{label}   {url}" if show_url else label
+    url_display = _footer_url_for_display(url) if url else ""
+    text = f"{label}   {url_display}" if show_url else label
     margin = _pdf_footer_reserve_mm(footer)
     pdf.set_auto_page_break(auto=False)
     pdf.set_font("courier", size=FONT_SIZE_SHEET_FOOTER)

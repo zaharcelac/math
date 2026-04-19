@@ -153,7 +153,7 @@ Within each worksheet (one run of `build_sections`):
 
 ## License
 
-If you publish code **without** a license, copyright law still applies: others get **no** extra rights (it is not “free for any use”). To be as open as possible—close to “no strings”—this project uses the **[Unlicense](https://unlicense.org/)**: software is dedicated to the **public domain** where that is possible, with a simple disclaimer.
+This project uses the **[Unlicense](https://unlicense.org/)**: software is dedicated to the **public domain** where that is possible, with a simple disclaimer.
 
 ```
 This is free and unencumbered software released into the public domain.

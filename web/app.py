@@ -33,6 +33,7 @@ if str(_ROOT) not in sys.path:
 from math_exercises import (  # noqa: E402
     EXERCISE_TYPES_ORDER,
     EXERCISE_TITLES,
+    EXERCISE_TYPE_EXAMPLES,
     default_pdf_output_path,
     generate_workbook_pdf_bytes,
     parse_exercise_type_tokens,
@@ -188,10 +189,11 @@ async def index(request: Request) -> Response:
             **_template_paths(),
             "types_order": EXERCISE_TYPES_ORDER,
             "type_titles": EXERCISE_TITLES,
+            "type_examples": EXERCISE_TYPE_EXAMPLES,
             "errors": None,
             "values": {
                 "total": 20,
-                "max_number": 20,
+                "max_number": 15,
                 "sheets": 1,
                 "seed": "",
             },
@@ -207,10 +209,10 @@ async def generate(request: Request) -> Response:
     form = await request.form()
     try:
         total = int(form.get("total", 12))
-        max_number = int(form.get("max_number", 20))
+        max_number = int(form.get("max_number", 15))
         sheets = int(form.get("sheets", 1))
     except (TypeError, ValueError):
-        total, max_number, sheets = 12, 20, 1
+        total, max_number, sheets = 12, 15, 1
     seed = str(form.get("seed") or "")
     types = form.getlist("types")
 
@@ -247,6 +249,7 @@ async def generate(request: Request) -> Response:
             **_template_paths(),
             "types_order": EXERCISE_TYPES_ORDER,
             "type_titles": EXERCISE_TITLES,
+            "type_examples": EXERCISE_TYPE_EXAMPLES,
             "errors": errors,
             "values": {
                 "total": total,
@@ -276,6 +279,7 @@ async def generate(request: Request) -> Response:
             **_template_paths(),
             "types_order": EXERCISE_TYPES_ORDER,
             "type_titles": EXERCISE_TITLES,
+            "type_examples": EXERCISE_TYPE_EXAMPLES,
             "errors": [str(e)],
             "values": {
                 "total": total,
