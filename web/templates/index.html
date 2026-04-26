@@ -127,10 +127,17 @@
           </span>
         </label>
         <label class="field-hint">
+          <span class="field-label">Min value in problem</span>
+          <span class="field-hint-with-input">
+            <input type="number" name="min_value" min="0" max="200" value="{{ values.min_value }}" required aria-describedby="hint-min-value" />
+            <span class="field-hint-text" id="hint-min-value">Lower bound for operands and answers (including the blank). Use 0 for the usual “include zero” range; raise this to avoid small numbers.</span>
+          </span>
+        </label>
+        <label class="field-hint">
           <span class="field-label">Max value in problem</span>
           <span class="field-hint-with-input">
             <input type="number" name="max_value" min="0" max="200" value="{{ values.max_value }}" required aria-describedby="hint-max-value" />
-            <span class="field-hint-text" id="hint-max-value">Complexity of equations. Set the max value of any operand on either side of the problem.</span>
+            <span class="field-hint-text" id="hint-max-value">Upper bound for operands and answers. Together with min value, this sets the numeric range for every exercise type.</span>
           </span>
         </label>
         <label class="field-hint">

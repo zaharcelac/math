@@ -193,6 +193,7 @@ async def index(request: Request) -> Response:
             "errors": None,
             "values": {
                 "total": 20,
+                "min_value": 0,
                 "max_value": 15,
                 "sheets": 1,
                 "seed": "",
@@ -209,10 +210,11 @@ async def generate(request: Request) -> Response:
     form = await request.form()
     try:
         total = int(form.get("total", 12))
+        min_value = int(form.get("min_value", 0))
         max_value = int(form.get("max_value", 15))
         sheets = int(form.get("sheets", 1))
     except (TypeError, ValueError):
-        total, max_value, sheets = 12, 15, 1
+        total, min_value, max_value, sheets = 12, 0, 15, 1
     seed = str(form.get("seed") or "")
     types = form.getlist("types")
 
@@ -221,8 +223,12 @@ async def generate(request: Request) -> Response:
 
     if total < 1 or total > MAX_TOTAL:
         errors.append(f"Total must be between 1 and {MAX_TOTAL}.")
+    if min_value < 0 or min_value > MAX_MAX_VALUE:
+        errors.append(f"Min value must be between 0 and {MAX_MAX_VALUE}.")
     if max_value < 0 or max_value > MAX_MAX_VALUE:
         errors.append(f"Max value must be between 0 and {MAX_MAX_VALUE}.")
+    if not errors and min_value > max_value:
+        errors.append("Min value must be less than or equal to max value.")
     if sheets < 1 or sheets > MAX_SHEETS:
         errors.append(f"Sheets must be between 1 and {MAX_SHEETS}.")
 
@@ -253,6 +259,7 @@ async def generate(request: Request) -> Response:
             "errors": errors,
             "values": {
                 "total": total,
+                "min_value": min_value,
                 "max_value": max_value,
                 "sheets": sheets,
                 "seed": seed,
@@ -273,6 +280,7 @@ async def generate(request: Request) -> Response:
             sheets,
             seed_val,
             footer_url=str(request.base_url),
+            min_value=min_value,
         )
     except RuntimeError as e:
         ctx = {
@@ -283,6 +291,7 @@ async def generate(request: Request) -> Response:
             "errors": [str(e)],
             "values": {
                 "total": total,
+                "min_value": min_value,
                 "max_value": max_value,
                 "sheets": sheets,
                 "seed": seed,

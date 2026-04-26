@@ -1,6 +1,6 @@
 # Grade 1 math worksheet generator
 
-`math_exercises.py` prints randomized arithmetic exercises to the terminal and optionally builds a **US Letter** PDF for printing. Tasks are tuned for early learners: operands and sums/differences stay within bounds you choose.
+`math_exercises.py` prints randomized arithmetic exercises to the terminal and optionally builds a **US Letter** PDF for printing. Tasks are tuned for early learners: every **shown** number and every **answer** (including the blank) stays in a numeric range you set with **`--min-value`** and **`--max-value`**.
 
 ## Requirements
 
@@ -16,7 +16,7 @@ pip install -r requirements.txt
 
 ## Web UI (MVP)
 
-Small browser UI with **FastAPI** and **HTMX**: fill the form, get a PDF download. The CLI below is unchanged for scripts and cron.
+Small browser UI with **FastAPI** and **HTMX**: fill the form (problems per type, **min value**, **max value**, sets, optional seed, exercise checkboxes), get a PDF download. The CLI below is unchanged for scripts and cron.
 
 From the repository root:
 
@@ -62,7 +62,7 @@ No sticky sessions or Traefik-specific download routes are required: PDF bytes a
 ## Quick start
 
 ```bash
-# Text only (default: all exercise types, 12 tasks each, max value 20)
+# Text only (default: all exercise types, 12 tasks each, values 0–20)
 python3 math_exercises.py
 
 # PDF for printing (default file: output/math_exercises_YYYY-MM-DD_HH-MM-SS.pdf)
@@ -70,6 +70,9 @@ python3 math_exercises.py --print
 
 # PDF at an explicit path
 python3 math_exercises.py --print -o worksheet.pdf
+
+# Avoid very small numbers (operands and answers stay at least 5)
+python3 math_exercises.py --min-value 5 --max-value 25 --print
 
 # Fewer tasks, larger numbers, only addition and subtraction
 python3 math_exercises.py --total 10 --max-value 50 --types a s --print
@@ -81,11 +84,12 @@ python3 math_exercises.py --total 10 --max-value 50 --types a s --print
 | Option                 | Meaning                                                                                                                                                           |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--total N`            | Number of problems **per selected type** (default: 12).                                                                                                           |
-| `--max-value N`        | No operand or sum/difference may exceed this bound (default: 20). Blanks use as many underscores as there are digits in `N`.                                      |
+| `--min-value N`        | Lower bound for operands and answers (default: 0). Must satisfy `0 ≤ min-value ≤ max-value`.                                                                     |
+| `--max-value N`        | Upper bound for operands and answers (default: 20). Sums and differences in plain `a + b = __` / `a - b = __` also stay within **[min-value, max-value]**. Blanks use as many underscores as the wider of min and max (by digit count). |
 | `--types TYPE …`       | Which exercise kinds to include (default: **all**). Order in the PDF follows the order you list. See [Exercise types](#exercise-types).                           |
 | `--print`              | Write a PDF (requires fpdf2).                                                                                                                                     |
 | `-o` / `--output PATH` | PDF output path. If omitted with `--print`, default is `output/math_exercises_YYYY-MM-DD_HH-MM-SS.pdf` (local time). The `output` directory is created if needed. |
-| `--sheets N`           | With `--print`, generate **N** independent worksheets in one PDF (each fully regenerated). Footer shows `TEST i OF N`. Ignored without `--print`.                 |
+| `--sheets N`           | With `--print`, generate **N** independent worksheets in one PDF (each fully regenerated). Footer shows `SET i OF N`. Ignored without `--print`.                 |
 | `--seed N`             | Fixed RNG seed. With `--print` and multiple sheets, sheet *i* uses seed `N + i`.                                                                                  |
 
 
@@ -104,8 +108,8 @@ Each type uses `--total` problems. Default order when `--types` is omitted:
 | `addition-missing-second`        | `ams`, `am2`                 | `a + __ = c`                                                           |
 | `subtraction-missing-minuend`    | `smf`, `sm1`, `smm`          | `__ - b = c`                                                           |
 | `subtraction-missing-subtrahend` | `sms`, `sm2`, `smt`          | `a - __ = c`                                                           |
-| `addition-balance`               | `ab`, `balance`, `bal`       | `a + b = c + __` (same sum both sides; all values ≤ max-value)        |
-| `subtraction-balance`            | `sb`, `subbalance`, `subbal` | `a - b = c - __` (same difference both sides; all values ≤ max-value) |
+| `addition-balance`               | `ab`, `balance`, `bal`       | `a + b = c + __` (same sum both sides; all values in **[min-value, max-value]**)        |
+| `subtraction-balance`            | `sb`, `subbalance`, `subbal` | `a - b = c - __` (same difference both sides; all values in **[min-value, max-value]**) |
 
 
 Example:
@@ -118,12 +122,12 @@ python3 math_exercises.py --types addition subtraction-missing-minuend --total 8
 
 - **Paper:** US Letter.
 - **Font:** Courier; section titles are centered; problems use a **two-column** grid (left column left-aligned, right column right-aligned).
-- **Alignment:** Operands and blanks are padded to the width of `--max-value` so `+`, `-`, and `=` line up.
+- **Alignment:** Operands and blanks are padded to the digit width of the **wider** of `--min-value` and `--max-value` so `+`, `-`, and `=` line up.
 - **Structure:** Each **exercise type** starts on a **new page** within a worksheet.
 - **Footer (every page):** centered line of the form  
-`TEST i OF n   MAX-VALUE …   TOTAL …`  
-where `i`/`n` come from `--sheets`, and the last two fields mirror `--max-value` and `--total`.
-- **Footer URL (optional):** when resolved, the URL can be appended on the **same** line as `TEST … MAX-VALUE … TOTAL …`, and a **small QR code** can be drawn at the end of that line encoding the **same** URL string. Order of precedence for the **URL value**: `WORKSHEET_FOOTER_URL`, `PUBLIC_BASE_URL`, the request’s `base_url` (web app), then `DEFAULT_WORKSHEET_FOOTER_URL` in `math_exercises.py`.
+`SET i OF n   MIN-VALUE …   MAX-VALUE …   TOTAL …`  
+where `i`/`n` come from `--sheets`, the min/max fields mirror **`--min-value`** and **`--max-value`**, and `TOTAL` mirrors **`--total`**.
+- **Footer URL (optional):** when resolved, the URL can be appended on the **same** line as `SET … MIN-VALUE … MAX-VALUE … TOTAL …`, and a **small QR code** can be drawn at the end of that line encoding the **same** URL string. Order of precedence for the **URL value**: `WORKSHEET_FOOTER_URL`, `PUBLIC_BASE_URL`, the request’s `base_url` (web app), then `DEFAULT_WORKSHEET_FOOTER_URL` in `math_exercises.py`.
 
 | Variable | Purpose |
 |----------|---------|
@@ -137,8 +141,10 @@ With `--print` and `--sheets` greater than 1, stdout shows only the **first** wo
 Within each worksheet (one run of `build_sections`):
 
 - **No duplicate** problem strings across all selected types on that sheet.
-- At most **about 5%** of problems (per type) may include the **numeric value 0** (values like 10 or 20 do not count as “zero problems”).
-- If the constraints cannot be satisfied (e.g. `--total` too large for `--max-value`), the program exits with an error suggesting you relax limits.
+- At most **about 5%** of problems (per type) may include the **numeric value 0** (values like 10 or 20 do not count as “zero problems”). If **`--min-value`** is **1** or greater, no problem contains **0** anyway.
+- If the constraints cannot be satisfied (e.g. `--total` too large for the **[min-value, max-value]** range), the program exits with an error suggesting you widen the range or reduce `--total`.
+
+Programmatic PDFs use **`generate_workbook_pdf_bytes(..., min_value=0)`** (keyword-only); the web app passes the form’s min/max fields through the same generator as the CLI.
 
 ## Files
 
